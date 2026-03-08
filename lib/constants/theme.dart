@@ -1,0 +1,152 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'colors.dart';
+
+class ApexTheme {
+  static ThemeData get dark {
+    final base = ThemeData.light(useMaterial3: true);
+    return base.copyWith(
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: ApexColors.bg,
+      primaryColor: ApexColors.accent,
+      colorScheme: const ColorScheme.light(
+        primary: ApexColors.accent,
+        secondary: ApexColors.blue,
+        surface: ApexColors.surface,
+        error: ApexColors.red,
+      ),
+      dividerColor: ApexColors.border,
+      textTheme: GoogleFonts.spaceGroteskTextTheme(base.textTheme).copyWith(
+        displayLarge: GoogleFonts.spaceGrotesk(
+          fontSize: 34,
+          fontWeight: FontWeight.w700,
+          color: ApexColors.t1,
+          height: 0.94,
+          letterSpacing: -1.2,
+        ),
+        headlineMedium: GoogleFonts.spaceGrotesk(
+          fontSize: 22,
+          fontWeight: FontWeight.w700,
+          color: ApexColors.t1,
+          height: 1.0,
+          letterSpacing: -0.4,
+        ),
+        titleLarge: GoogleFonts.spaceGrotesk(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: ApexColors.t1,
+        ),
+        titleMedium: GoogleFonts.spaceGrotesk(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: ApexColors.t1,
+        ),
+        bodyLarge: GoogleFonts.spaceGrotesk(
+          fontSize: 14,
+          color: ApexColors.t1,
+          height: 1.5,
+        ),
+        bodyMedium: GoogleFonts.spaceGrotesk(
+          fontSize: 13,
+          color: ApexColors.t2,
+          height: 1.55,
+        ),
+        bodySmall: GoogleFonts.spaceGrotesk(
+          fontSize: 11,
+          color: ApexColors.t2,
+          height: 1.5,
+        ),
+        labelLarge: GoogleFonts.spaceGrotesk(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: ApexColors.t1,
+          letterSpacing: 0.1,
+        ),
+        labelSmall: GoogleFonts.spaceGrotesk(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: ApexColors.t3,
+          letterSpacing: 1.0,
+        ),
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: ApexColors.t1,
+      ),
+      cardTheme: CardThemeData(
+        color: ApexColors.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(26),
+          side: const BorderSide(color: ApexColors.border),
+        ),
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        surfaceTintColor: Colors.transparent,
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: ApexColors.surface,
+        surfaceTintColor: Colors.transparent,
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: ApexColors.cardAlt,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: ApexColors.border, width: 1.1),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: ApexColors.border, width: 1.1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: ApexColors.accent, width: 1.2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: const BorderSide(color: ApexColors.red, width: 1.2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        labelStyle: GoogleFonts.spaceGrotesk(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: ApexColors.t2,
+          letterSpacing: 0.8,
+        ),
+        hintStyle: GoogleFonts.spaceGrotesk(
+          fontSize: 13,
+          color: ApexColors.t3,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: ApexColors.accent,
+        contentTextStyle: GoogleFonts.spaceGrotesk(color: ApexColors.ink),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: Colors.transparent,
+        selectedItemColor: ApexColors.accent,
+        unselectedItemColor: ApexColors.t3,
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: ApexColors.accent,
+      ),
+    );
+  }
+
+  static TextStyle mono({
+    double size = 13,
+    FontWeight weight = FontWeight.w700,
+    Color color = ApexColors.t1,
+  }) {
+    return GoogleFonts.dmMono(
+      fontSize: size,
+      fontWeight: weight,
+      color: color,
+    );
+  }
+}

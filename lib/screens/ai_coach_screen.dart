@@ -1,0 +1,241 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../constants/colors.dart';
+import '../services/ai_service.dart';
+import '../widgets/apex_orb_logo.dart';
+
+class AiCoachScreen extends StatefulWidget {
+  final Map<String, dynamic>? profile;
+  final List<Map<String, dynamic>> recentLogs;
+  const AiCoachScreen({super.key, this.profile, required this.recentLogs});
+
+  @override
+  State<AiCoachScreen> createState() => _AiCoachScreenState();
+}
+
+class _AiCoachScreenState extends State<AiCoachScreen> {
+  final List<Map<String, String>> _msgs = [
+    {'role': 'assistant', 'content': "Your coach already knows your profile and recent training. Ask for plans, nutrition ideas, recovery adjustments, or form cues."}
+  ];
+  final _inputC = TextEditingController();
+  final _scrollC = ScrollController();
+  bool _thinking = false;
+
+  static const _prompts = ['Best post-workout meal?', 'Build me a 5-day split', 'How to break plateau?', 'Am I overtraining?', 'Tips for fat loss?', 'Best exercises for back?'];
+
+  void _scrollBottom() {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_scrollC.hasClients) _scrollC.animateTo(_scrollC.position.maxScrollExtent, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+    });
+  }
+
+  Future<void> _send() async {
+    if (_inputC.text.trim().isEmpty || _thinking) return;
+    final userMsg = {'role': 'user', 'content': _inputC.text.trim()};
+    setState(() { _msgs.add(userMsg); _thinking = true; });
+    _inputC.clear();
+    _scrollBottom();
+
+    try {
+      final recentLogDescs = widget.recentLogs.take(3).map((l) =>
+        '${l['workout_name']}(${l['duration_min']}min,${((l['total_volume'] as num?)?.round() ?? 0)}kg,${l['intensity'] ?? 'moderate'})'
+      ).toList();
+
+      final reply = await AIService.chat(
+        messages: _msgs,
+        athleteName: widget.profile?['name'] ?? 'Athlete',
+        goal: widget.profile?['goal'] ?? 'Build Muscle',
+        weightKg: (widget.profile?['weight_kg'] as num?)?.toDouble(),
+        heightCm: (widget.profile?['height_cm'] as num?)?.toDouble(),
+        recentLogs: recentLogDescs,
+      );
+      setState(() => _msgs.add({'role': 'assistant', 'content': reply.trim()}));
+    } catch (e) {
+      setState(() => _msgs.add({'role': 'assistant', 'content': '❌ $e'}));
+    }
+    setState(() => _thinking = false);
+    _scrollBottom();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          decoration: BoxDecoration(
+            color: ApexColors.surface.withAlpha(220),
+            border: Border(bottom: BorderSide(color: ApexColors.border)),
+          ),
+          child: Row(
+            children: [
+              const ApexOrbLogo(size: 54, label: 'AI', elevated: false),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Coach', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w800, fontSize: 20, color: ApexColors.t1)),
+                  const SizedBox(height: 4),
+                  Text('Context-aware training help for your current profile.', style: TextStyle(fontSize: 11, color: ApexColors.t2)),
+                ]),
+              ),
+              const SizedBox(width: 60),
+            ],
+          ),
+        ),
+
+        Expanded(
+          child: ListView.builder(
+            controller: _scrollC,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            itemCount: _msgs.length + (_thinking ? 1 : 0),
+            itemBuilder: (ctx, i) {
+              if (i == _msgs.length) return _typingIndicator();
+              final m = _msgs[i];
+              final isUser = m['role'] == 'user';
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (!isUser) ...[
+                      const ApexOrbLogo(size: 28, label: 'AI', elevated: false),
+                      const SizedBox(width: 7),
+                    ],
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isUser ? ApexColors.accent : ApexColors.card,
+                          borderRadius: BorderRadius.only(
+                            topLeft: const Radius.circular(14),
+                            topRight: const Radius.circular(14),
+                            bottomLeft: Radius.circular(isUser ? 14 : 3),
+                            bottomRight: Radius.circular(isUser ? 3 : 14),
+                          ),
+                          border: isUser ? null : Border.all(color: ApexColors.border),
+                        ),
+                        child: Text(m['content']!, style: TextStyle(color: isUser ? ApexColors.bg : ApexColors.t1, fontSize: 12, height: 1.6)),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+
+        if (_msgs.length <= 1)
+          SizedBox(
+            height: 42,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: _prompts.map((p) => Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() => _inputC.text = p);
+                  },
+                    child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(color: ApexColors.surface, border: Border.all(color: ApexColors.border), borderRadius: BorderRadius.circular(18)),
+                    child: Text(p, style: TextStyle(fontSize: 10, color: ApexColors.t2, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              )).toList(),
+            ),
+          ),
+
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 9, 16, 12),
+          decoration: BoxDecoration(color: ApexColors.surface.withAlpha(220), border: Border(top: BorderSide(color: ApexColors.border))),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _inputC,
+                  onChanged: (_) => setState(() {}),
+                  onSubmitted: (_) => _send(),
+                  style: GoogleFonts.spaceGrotesk(fontSize: 12, color: ApexColors.t1),
+                  decoration: InputDecoration(
+                    hintText: 'Ask your AI coach...',
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(11), borderSide: BorderSide(color: ApexColors.border, width: 1.5)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: _send,
+                child: Container(
+                  width: 42, height: 42,
+                  decoration: BoxDecoration(
+                    color: _inputC.text.trim().isNotEmpty && !_thinking ? ApexColors.accent : ApexColors.border,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Center(
+                    child: _thinking
+                        ? const SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2, color: ApexColors.t3))
+                        : const Icon(Icons.arrow_upward, color: ApexColors.ink, size: 18),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _typingIndicator() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          const ApexOrbLogo(size: 28, label: 'AI', elevated: false),
+          const SizedBox(width: 7),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            decoration: BoxDecoration(color: ApexColors.card, border: Border.all(color: ApexColors.border), borderRadius: const BorderRadius.only(topLeft: Radius.circular(14), topRight: Radius.circular(14), bottomRight: Radius.circular(14), bottomLeft: Radius.circular(3))),
+            child: Row(children: List.generate(3, (i) => _Dot(delay: i * 200))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() { _inputC.dispose(); _scrollC.dispose(); super.dispose(); }
+}
+
+class _Dot extends StatefulWidget {
+  final int delay;
+  const _Dot({required this.delay});
+  @override
+  State<_Dot> createState() => _DotState();
+}
+
+class _DotState extends State<_Dot> with SingleTickerProviderStateMixin {
+  late AnimationController _c;
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat();
+    Future.delayed(Duration(milliseconds: widget.delay), () { if (mounted) _c.forward(from: 0); });
+  }
+  @override
+  void dispose() { _c.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (_, __) => Container(
+        width: 5, height: 5,
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: BoxDecoration(color: ApexColors.t2.withAlpha((_c.value * 255).round()), shape: BoxShape.circle),
+      ),
+    );
+  }
+}

@@ -1,0 +1,38 @@
+name: apex_ai
+description: APEX AI — AI-Powered Fitness Coach
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  supabase_flutter: ^2.8.4
+  google_generative_ai: ^0.4.6
+  image_picker: ^1.1.2
+  share_plus: ^10.1.4
+  path_provider: ^2.1.5
+  shared_preferences: ^2.3.4
+  intl: ^0.19.0
+  fl_chart: ^0.70.2
+  flutter_image_compress: ^2.3.0
+  csv: ^6.0.0
+  pdf: ^3.11.2
+  path: ^1.9.1
+  uuid: ^4.5.1
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_driver:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true

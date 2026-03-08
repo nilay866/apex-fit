@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>APEX AI — Fitness Coach v3</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body,#root{height:100%;background:#07090F}
+body{font-family:'Syne',sans-serif;color:#EEF3FF;overflow:hidden}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#192334;border-radius:2px}
+input,textarea,button,select{font-family:'Syne',sans-serif;outline:none}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes popIn{from{opacity:0;transform:scale(.93)}to{opacity:1;transform:scale(1)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.fu{animation:fadeUp .3s ease both}
+.fi{animation:fadeIn .2s ease both}
+.pi{animation:popIn .2s ease both}
+.screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;padding-bottom:90px}
+</style>
+</head>
+<body><div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useCallback,useRef,useMemo}=React;
+const C={
+  bg:"#07090F",surface:"#0C1219",card:"#101720",border:"#192334",
+  accent:"#00E87A",accentD:"#00E87A14",blue:"#38BDF8",orange:"#FB923C",
+  purple:"#C084FC",red:"#F87171",yellow:"#FCD34D",cyan:"#22D3EE",
+  pink:"#F472B6",t1:"#EEF3FF",t2:"#6E8BAE",t3:"#2A3F58"
+};
+
+const makeDB=(url,key)=>{
+  const h=(tok,x={})=>({apikey:key,"Content-Type":"application/json",...(tok?{Authorization:`Bearer ${tok}`}:{}), ...x});
+  const q=t=>({
+    select:(c="*",tok,qs="")=>fetch(`${url}/rest/v1/${t}?select=${c}${qs}`,{headers:h(tok,{Prefer:"return=representation"})}).then(r=>r.json()),
+    insert:(d,tok)=>fetch(`${url}/rest/v1/${t}`,{method:"POST",headers:h(tok,{Prefer:"return=representation"}),body:JSON.stringify(d)}).then(r=>r.json()),
+    update:(d,tok,qs)=>fetch(`${url}/rest/v1/${t}?${qs}`,{method:"PATCH",headers:h(tok,{Prefer:"return=representation"}),body:JSON.stringify(d)}).then(r=>r.json()),
+    del:(tok,qs)=>fetch(`${url}/rest/v1/${t}?${qs}`,{method:"DELETE",headers:h(tok)}).then(r=>r.ok),
+  });
+  return{
+    auth:{
+      signUp:(e,p,n)=>fetch(`${url}/auth/v1/signup`,{method:"POST",headers:h(null),body:JSON.stringify({email:e,password:p,data:{name:n}})}).then(r=>r.json()),
+      signIn:(e,p)=>fetch(`${url}/auth/v1/token?grant_type=password`,{method:"POST",headers:h(null),body:JSON.stringify({email:e,password:p})}).then(r=>r.json()),
+      signOut:(tok)=>fetch(`${url}/auth/v1/logout`,{method:"POST",headers:h(tok)}),
+    },
+    from:q,
+  };
+};
+
+const callAI=async(prompt,apiKey)=>{
+  if(!apiKey)throw new Error("No Groq API key — add it in Setup");
+  let resp;
+  try{resp=await fetch("https://api.groq.com/openai/v1/chat/completions",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${apiKey.trim()}`},body:JSON.stringify({model:"llama-3.3-70b-versatile",max_tokens:1000,temperature:0.5,messages:[{role:"user",content:prompt}]})});}
+  catch(e){throw new Error("Network error: "+e.message);}
+  const d=await resp.json();
+  if(!resp.ok||d.error){
+    const code=d.error?.code||resp.status;const msg=d.error?.message||"Unknown";
+    if(code===429||code==="rate_limit_exceeded")throw new Error("Rate limit — wait a moment and retry");
+    if(code===401||code==="invalid_api_key")throw new Error("Invalid Groq API key — check at console.groq.com/keys");
+    throw new Error("Groq error: "+msg);
+  }
+  if(!d.choices?.length)throw new Error("Groq returned empty response");
+  return d.choices[0].message?.content||"";
+};
+const extractJSON=raw=>{
+  const s=raw.replace(/```json/gi,"").replace(/```/g,"").trim();
+  try{return JSON.parse(s);}catch(e){}
+  const a=s.indexOf("{"),b=s.lastIndexOf("}");
+  if(a!==-1&&b>a){try{return JSON.parse(s.slice(a,b+1));}catch(e){}}
+  throw new Error("Could not parse JSON from AI");
+};
+
+const compressImage=(file,maxW=1200,quality=0.75)=>new Promise(resolve=>{
+  const img=new Image();
+  const url=URL.createObjectURL(file);
+  img.onload=()=>{
+    const ratio=Math.min(1,maxW/img.width);
+    const canvas=document.createElement("canvas");
+    canvas.width=Math.round(img.width*ratio);
+    canvas.height=Math.round(img.height*ratio);
+    canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);
+    URL.revokeObjectURL(url);
+    resolve(canvas.toDataURL("image/jpeg",quality));
+  };
+  img.src=url;
+});
+
+const downloadImage=(dataUrl,filename="apex-photo.jpg")=>{
+  const a=document.createElement("a");a.href=dataUrl;a.download=filename;a.click();
+};
+const downloadCSV=(data,filename)=>{
+  if(!data.length)return;
+  const keys=Object.keys(data[0]);
+  const csv=[keys.join(","),...data.map(r=>keys.map(k=>JSON.stringify(r[k]||"")).join(","))].join("\n");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download=filename;a.click();
+};
+const downloadXLSX=(sheets,filename)=>{
+  if(typeof XLSX==="undefined"){alert("XLSX library not loaded");return;}
+  const wb=XLSX.utils.book_new();
+  sheets.forEach(({name,data})=>{XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(data),name);});
+  XLSX.writeFile(wb,filename);
+};
+const downloadPDF=(title,sections)=>{
+  const win=window.open("","_blank");
+  const body=sections.map(({heading,rows,cols})=>`<h2>${heading}</h2><table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table>`).join("");
+  win.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>body{font-family:Arial,sans-serif;padding:30px;color:#1a1a2e}h1{color:#00E87A;font-size:26px}h2{color:#333;font-size:16px;margin:20px 0 8px;border-bottom:2px solid #00E87A;padding-bottom:4px}table{width:100%;border-collapse:collapse;margin:8px 0}th{background:#00E87A;color:#fff;padding:7px 10px;font-size:11px;text-align:left}td{padding:7px 10px;border-bottom:1px solid #eee;font-size:11px}@media print{body{padding:10px}}</style></head><body><h1>⚡ APEX AI — ${title}</h1><p style="color:#888;font-size:12px">Exported ${new Date().toLocaleDateString()}</p>${body}</body></html>`);
+  win.document.close();
+  setTimeout(()=>win.print(),400);
+};
+
+const shareText=(platform,text)=>{
+  const enc=encodeURIComponent(text);
+  const urls={whatsapp:`https://wa.me/?text=${enc}`,twitter:`https://twitter.com/intent/tweet?text=${enc}`,facebook:`https://www.facebook.com/sharer/sharer.php?quote=${enc}`,telegram:`https://t.me/share/url?url=https://apexfitness.app&text=${enc}`};
+  if(urls[platform]){window.open(urls[platform],"_blank");return;}
+  navigator.clipboard?.writeText(text).then(()=>alert(`✅ Copied! Now open ${platform} and paste in your story/post.`));
+};
+const shareImageToSocial=async(platform,dataUrl,caption="")=>{
+  if(platform==="native"&&navigator.share){
+    try{const res=await fetch(dataUrl);const blob=await res.blob();const file=new File([blob],"apex-progress.jpg",{type:"image/jpeg"});if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:"APEX AI Progress",text:caption||"My fitness progress with APEX AI 💪"});return;}}catch(e){}
+  }
+  if(platform==="instagram"||platform==="snapchat"){downloadImage(dataUrl,`apex-${platform}-photo.jpg`);setTimeout(()=>alert(`📥 Photo downloaded!\n\nNow open ${platform==="instagram"?"Instagram":"Snapchat"} → create a Story or Post → choose from your gallery.`),300);return;}
+  shareText(platform,caption||"My fitness progress 💪 #APEXAI #fitness");
+};
+const shareReport=(platform,stats)=>{
+  const text=`💪 My APEX AI Fitness Report\n\n🔥 ${stats.sessions} sessions completed\n📦 ${stats.volume}kg total volume\n⏱ ${stats.minutes} minutes trained\n🍽️ ${stats.avgCal} avg calories/day\n\nTracking with APEX AI Fitness Coach\n#fitness #gains #apexai`;
+  shareText(platform,text);
+};
+const SQL=`-- APEX AI v3 — Run in Supabase SQL Editor
+create table if not exists public.profiles (id uuid references auth.users on delete cascade primary key, name text, weight_kg numeric, height_cm numeric, goal text default 'Build Muscle', calorie_goal int default 2000, water_goal_ml int default 2500, created_at timestamptz default now());
+create table if not exists public.workouts (id uuid default gen_random_uuid() primary key, user_id uuid references auth.users on delete cascade, name text not null, type text default 'Gym', created_at timestamptz default now());
+create table if not exists public.exercises (id uuid default gen_random_uuid() primary key, workout_id uuid references public.workouts on delete cascade, name text not null, sets int default 3, reps text default '8-12', target_weight numeric);
+create table if not exists public.workout_logs (id uuid default gen_random_uuid() primary key, user_id uuid references auth.users on delete cascade, workout_name text, duration_min int, total_volume numeric default 0, intensity text default 'moderate', notes text, completed_at timestamptz default now());
+create table if not exists public.set_logs (id uuid default gen_random_uuid() primary key, log_id uuid references public.workout_logs on delete cascade, exercise_name text, set_number int, reps_done int, weight_kg numeric, logged_at timestamptz default now());
+create table if not exists public.nutrition_logs (id uuid default gen_random_uuid() primary key, user_id uuid references auth.users on delete cascade, meal_name text not null, quantity text, calories int default 0, protein_g numeric default 0, carbs_g numeric default 0, fat_g numeric default 0, logged_at timestamptz default now());
+create table if not exists public.body_weight_logs (id uuid default gen_random_uuid() primary key, user_id uuid references auth.users on delete cascade, weight_kg numeric not null, logged_at timestamptz default now());
+create table if not exists public.water_logs (id uuid default gen_random_uuid() primary key, user_id uuid references auth.users on delete cascade, amount_ml int not null, logged_at timestamptz default now());
+create table if not exists public.progress_photos (id uuid default gen_random_uuid() primary key, user_id uuid references auth.users on delete cascade, photo_data text not null, caption text, taken_at timestamptz default now());
+alter table public.profiles add column if not exists name text;
+alter table public.profiles add column if not exists weight_kg numeric;
+alter table public.profiles add column if not exists height_cm numeric;
+alter table public.profiles add column if not exists goal text default 'Build Muscle';
+alter table public.profiles add column if not exists calorie_goal int default 2000;
+alter table public.profiles add column if not exists water_goal_ml int default 2500;
+alter table public.water_logs add column if not exists amount_ml int;
+alter table public.water_logs add column if not exists logged_at timestamptz default now();
+update public.profiles set calorie_goal = coalesce(calorie_goal, 2000), water_goal_ml = coalesce(water_goal_ml, 2500);
+update public.water_logs set amount_ml = coalesce(amount_ml, 250) where amount_ml is null;
+alter table public.water_logs alter column amount_ml set not null;
+alter table public.profiles enable row level security;
+alter table public.workouts enable row level security;
+alter table public.exercises enable row level security;
+alter table public.workout_logs enable row level security;
+alter table public.set_logs enable row level security;
+alter table public.nutrition_logs enable row level security;
+alter table public.body_weight_logs enable row level security;
+alter table public.water_logs enable row level security;
+alter table public.progress_photos enable row level security;
+drop policy if exists "own_profile" on public.profiles; create policy "own_profile" on public.profiles for all using (auth.uid()=id) with check (auth.uid()=id);
+drop policy if exists "own_workouts" on public.workouts; create policy "own_workouts" on public.workouts for all using (auth.uid()=user_id) with check (auth.uid()=user_id);
+drop policy if exists "own_exercises" on public.exercises; create policy "own_exercises" on public.exercises for all using (auth.uid()=(select user_id from public.workouts where id=workout_id));
+drop policy if exists "own_logs" on public.workout_logs; create policy "own_logs" on public.workout_logs for all using (auth.uid()=user_id) with check (auth.uid()=user_id);
+drop policy if exists "own_set_logs" on public.set_logs; create policy "own_set_logs" on public.set_logs for all using (auth.uid()=(select user_id from public.workout_logs where id=log_id));
+drop policy if exists "own_nutrition" on public.nutrition_logs; create policy "own_nutrition" on public.nutrition_logs for all using (auth.uid()=user_id) with check (auth.uid()=user_id);
+drop policy if exists "own_weight" on public.body_weight_logs; create policy "own_weight" on public.body_weight_logs for all using (auth.uid()=user_id) with check (auth.uid()=user_id);
+drop policy if exists "own_water" on public.water_logs; create policy "own_water" on public.water_logs for all using (auth.uid()=user_id) with check (auth.uid()=user_id);
+drop policy if exists "own_photos" on public.progress_photos; create policy "own_photos" on public.progress_photos for all using (auth.uid()=user_id) with check (auth.uid()=user_id);
+create or replace function public.handle_new_user() returns trigger as $$ begin insert into public.profiles(id,name) values(new.id,new.raw_user_meta_data->>'name') on conflict(id) do nothing; return new; end; $$ language plpgsql security definer;
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created after insert on auth.users for each row execute procedure public.handle_new_user();`;
+
+const Spin=({s=20,c=C.accent})=><div style={{width:s,height:s,border:`2px solid ${c}25`,borderTop:`2px solid ${c}`,borderRadius:"50%",animation:"spin .65s linear infinite",flexShrink:0}}/>;
+const Btn=({children,onClick,color=C.accent,outline,full,sm,disabled,loading,sx={}})=>(
+  <button onClick={disabled||loading?undefined:onClick} style={{background:outline?"transparent":color,color:outline?color:C.bg,border:outline?`1.5px solid ${color}`:"none",padding:sm?"7px 14px":"12px 20px",borderRadius:10,fontWeight:700,fontSize:sm?12:14,width:full?"100%":"auto",opacity:disabled?.4:1,display:"inline-flex",alignItems:"center",justifyContent:"center",gap:7,transition:"all .15s",cursor:disabled?"not-allowed":"pointer",...sx}}>
+    {loading?<Spin s={14} c={outline?color:C.bg}/>:children}
+  </button>
+);
+const Inp=({label,value,onChange,type="text",placeholder,rows,small,mono})=>(
+  <div style={{display:"flex",flexDirection:"column",gap:4}}>
+    {label&&<label style={{fontSize:11,color:C.t2,fontWeight:700,letterSpacing:.7,textTransform:"uppercase"}}>{label}</label>}
+    {rows?<textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows} style={{background:C.surface,border:`1.5px solid ${C.border}`,borderRadius:9,padding:"10px 12px",color:C.t1,fontSize:small?12:13,resize:"vertical",fontFamily:mono?"'DM Mono',monospace":"inherit"}}/>
+    :<input type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={{background:C.surface,border:`1.5px solid ${C.border}`,borderRadius:9,padding:small?"7px 10px":"10px 12px",color:C.t1,fontSize:small?12:13,fontFamily:mono?"'DM Mono',monospace":"inherit"}}/>}
+  </div>
+);
+const Card=({children,sx={},glow,color})=>(<div style={{background:C.card,border:`1px solid ${glow?(color||C.accent)+"45":C.border}`,borderRadius:14,padding:14,boxShadow:glow?`0 0 20px ${(color||C.accent)}15`:"none",...sx}}>{children}</div>);
+const Tag=({children,color=C.accent})=>(<span style={{background:color+"18",color,border:`1px solid ${color}28`,padding:"2px 9px",borderRadius:20,fontSize:11,fontWeight:700}}>{children}</span>);
+const MacroBar=({label,val,goal,color})=>{
+  const pct=Math.min(100,goal>0?(val/goal)*100:0);
+  return(<div style={{marginBottom:7}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:11,color:C.t2,fontWeight:700}}>{label}</span><span style={{fontSize:11,color,fontWeight:700,fontFamily:"'DM Mono'"}}>{Math.round(val)}<span style={{color:C.t3}}>/{goal}</span></span></div><div style={{height:4,background:C.border,borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${pct}%`,background:color,borderRadius:2,transition:"width .5s ease"}}/></div></div>);
+};
+const Modal=({title,onClose,children})=>(
+  <div className="fi" style={{position:"fixed",inset:0,background:"#000C",zIndex:300,display:"flex",alignItems:"flex-end"}} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+    <div className="fu" style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"20px 20px 0 0",width:"100%",maxHeight:"93vh",display:"flex",flexDirection:"column"}}>
+      <div style={{padding:"16px 16px 12px",display:"flex",alignItems:"center",justifyContent:"space-between",borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
+        <h2 style={{fontWeight:800,fontSize:16}}>{title}</h2>
+        <button onClick={onClose} style={{background:C.surface,border:`1px solid ${C.border}`,color:C.t2,borderRadius:8,width:32,height:32,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+      </div>
+      <div style={{overflowY:"auto",padding:"14px 16px 0",flex:1}}>{children}</div>
+      <div style={{height:16}}/>
+    </div>
+  </div>
+);
+function SocialShareRow({onShare}){
+  const platforms=[{id:"whatsapp",label:"WhatsApp",icon:"💬",color:"#25D366"},{id:"instagram",label:"Instagram",icon:"📸",color:"#E1306C"},{id:"snapchat",label:"Snapchat",icon:"👻",color:"#FFFC00"},{id:"facebook",label:"Facebook",icon:"📘",color:"#1877F2"},{id:"twitter",label:"Twitter/X",icon:"🐦",color:"#1DA1F2"},{id:"telegram",label:"Telegram",icon:"✈️",color:"#0088cc"}];
+  return(<div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7}}>{platforms.map(p=>(<button key={p.id} onClick={()=>onShare(p.id)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,background:p.color+"18",border:`1.5px solid ${p.color}35`,borderRadius:11,padding:"10px 6px",cursor:"pointer",color:p.color,transition:"all .15s"}}><span style={{fontSize:20}}>{p.icon}</span><span style={{fontSize:9,fontWeight:700,textAlign:"center"}}>{p.label}</span></button>))}</div>);
+}
+function SetupScreen({onConnect}){
+  const[url,setUrl]=useState("");const[key,setKey]=useState("");const[aiKey,setAiKey]=useState("");
+  const[showSql,setShowSql]=useState(false);const[copied,setCopied]=useState(false);
+  const[err,setErr]=useState("");const[testing,setTesting]=useState(false);const[result,setResult]=useState(null);
+  const[testingAI,setTestingAI]=useState(false);const[aiResult,setAiResult]=useState(null);
+  const testDB=async()=>{
+    if(!url||!key){setErr("Enter URL and key first.");return;}
+    setTesting(true);setResult(null);setErr("");
+    try{const r=await fetch(url.trim().replace(/\/$/,"")+"/rest/v1/",{headers:{apikey:key.trim(),"Content-Type":"application/json"}});
+      if(r.ok||r.status===404||r.status===400)setResult({ok:true,msg:"✅ Supabase connected! (HTTP "+r.status+")"});
+      else if(r.status===401)setResult({ok:false,msg:"❌ Wrong key — use anon/public key from Settings → API"});
+      else setResult({ok:false,msg:"❌ HTTP "+r.status+" — project may be paused at supabase.com"});
+    }catch(e){setResult({ok:false,msg:"❌ Cannot reach Supabase. Check URL or resume project."});}
+    finally{setTesting(false);}
+  };
+  const testAI=async()=>{
+    if(!aiKey.trim()){setAiResult({ok:false,msg:"Enter your Groq API key first."});return;}
+    setTestingAI(true);setAiResult(null);
+    try{const t=await callAI("Reply with exactly: APEX AI ready",aiKey.trim());setAiResult({ok:true,msg:"✅ Groq AI working! "+t.trim().slice(0,50)});}
+    catch(e){setAiResult({ok:false,msg:"❌ "+e.message});}
+    finally{setTestingAI(false);}
+  };
+  const launch=()=>{
+    if(!url||!key){setErr("Supabase URL and key required.");return;}
+    if(!aiKey.trim()){setErr("Groq API key required for AI features.");return;}
+    onConnect(url.trim().replace(/\/$/,""),key.trim(),aiKey.trim());
+  };
+  const Step=({n,t,children})=>(<div style={{marginBottom:20}}><div style={{display:"flex",alignItems:"center",gap:9,marginBottom:11}}><div style={{width:24,height:24,borderRadius:"50%",background:C.accent,color:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,flexShrink:0}}>{n}</div><span style={{fontWeight:700,fontSize:13}}>{t}</span></div>{children}</div>);
+  return(
+    <div className="screen" style={{display:"flex",alignItems:"center",justifyContent:"center",padding:18,background:`radial-gradient(ellipse at 30% 20%,${C.accent}07,transparent 55%),${C.bg}`}}>
+      <div style={{width:"100%",maxWidth:440}} className="fu">
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <div style={{display:"inline-flex",alignItems:"center",gap:10,marginBottom:6}}>
+            <div style={{width:46,height:46,background:C.accent,borderRadius:13,display:"flex",alignItems:"center",justifyContent:"center",fontSize:23}}>⚡</div>
+            <span style={{fontSize:30,fontWeight:800,letterSpacing:2}}>APEX AI</span>
+          </div>
+          <p style={{color:C.t2,fontSize:12}}>AI-Powered Fitness Coach v3</p>
+        </div>
+        <Card>
+          <Step n="1" t="Create free Supabase project">
+            <a href="https://supabase.com" target="_blank" style={{display:"block",background:C.surface,border:`1px dashed ${C.border}`,borderRadius:8,padding:"8px 12px",color:C.blue,fontSize:12,textDecoration:"none",textAlign:"center",marginBottom:6}}>→ supabase.com (free)</a>
+            <p style={{fontSize:10,color:C.yellow,lineHeight:1.5}}>⚠️ Free projects pause after 1 week — Resume at supabase.com if needed</p>
+          </Step>
+          <Step n="2" t="Run SQL schema">
+            <button onClick={()=>setShowSql(s=>!s)} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"8px 12px",color:C.t2,fontSize:11,width:"100%",textAlign:"left",cursor:"pointer"}}>{showSql?"▾":"▸"} Show SQL → paste into Supabase SQL Editor → Run</button>
+            {showSql&&<div className="fi" style={{marginTop:7,position:"relative"}}>
+              <pre style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:10,fontSize:9.5,color:C.t2,overflowX:"auto",maxHeight:140,overflowY:"auto",lineHeight:1.5,fontFamily:"'DM Mono',monospace"}}>{SQL}</pre>
+              <button onClick={()=>{navigator.clipboard.writeText(SQL);setCopied(true);setTimeout(()=>setCopied(false),2000);}} style={{position:"absolute",top:7,right:7,background:copied?C.accent:C.card,color:copied?C.bg:C.t2,border:`1px solid ${C.border}`,borderRadius:6,padding:"2px 9px",fontSize:10,fontWeight:700,cursor:"pointer"}}>{copied?"✓":"Copy"}</button>
+            </div>}
+          </Step>
+          <Step n="3" t="Supabase credentials (Settings → API)">
+            <div style={{display:"flex",flexDirection:"column",gap:9}}>
+              <Inp label="Project URL" value={url} onChange={v=>{setUrl(v);setResult(null);}} placeholder="https://xxxxxxxx.supabase.co"/>
+              <Inp label="Anon/Public Key" value={key} onChange={v=>{setKey(v);setResult(null);}} placeholder="eyJhbGci..." mono/>
+            </div>
+            <button onClick={testDB} disabled={testing||!url||!key} style={{marginTop:9,width:"100%",padding:"9px",background:"transparent",border:`1.5px solid ${C.blue}`,borderRadius:8,color:C.blue,fontWeight:700,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7,fontFamily:"'Syne'",opacity:url&&key?1:.4}}>
+              {testing?<><Spin s={12} c={C.blue}/>Testing...</>:"🔍 Test Supabase Connection"}
+            </button>
+            {result&&<div className="pi" style={{marginTop:8,background:result.ok?C.accent+"14":C.red+"14",border:`1px solid ${result.ok?C.accent+"40":C.red+"40"}`,borderRadius:8,padding:"9px 12px",fontSize:11,color:result.ok?C.accent:C.red,lineHeight:1.5}}>{result.msg}</div>}
+          </Step>
+          <Step n="4" t="Groq API key (Free — Llama 3.3 70B)">
+            <a href="https://console.groq.com/keys" target="_blank" style={{display:"block",background:C.surface,border:`1px dashed ${C.border}`,borderRadius:8,padding:"7px 12px",color:C.accent,fontSize:11,textDecoration:"none",textAlign:"center",marginBottom:7}}>→ console.groq.com/keys — 100% free</a>
+            <Inp label="Groq Key (gsk_...)" value={aiKey} onChange={v=>{setAiKey(v);setAiResult(null);}} placeholder="gsk_..." mono/>
+            <button onClick={testAI} disabled={testingAI} style={{marginTop:9,width:"100%",padding:"9px",background:"transparent",border:`1.5px solid ${C.purple}`,borderRadius:8,color:C.purple,fontWeight:700,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7,fontFamily:"'Syne'"}}>
+              {testingAI?<><Spin s={12} c={C.purple}/>Testing...</>:"🤖 Test Groq AI"}
+            </button>
+            {aiResult&&<div className="pi" style={{marginTop:8,background:aiResult.ok?C.purple+"14":C.red+"14",border:`1px solid ${aiResult.ok?C.purple+"40":C.red+"40"}`,borderRadius:8,padding:"9px 12px",fontSize:11,color:aiResult.ok?C.purple:C.red}}>{aiResult.msg}</div>}
+          </Step>
+          {err&&<p style={{color:C.red,fontSize:11,marginBottom:10,background:C.red+"14",padding:"7px 10px",borderRadius:7}}>{err}</p>}
+          <Btn onClick={launch} full>Launch App ⚡</Btn>
+        </Card>
+      </div>
+    </div>
+  );
+}
+function AuthScreen({db,onAuth}){
+  const[mode,setMode]=useState("login");
+  const[name,setName]=useState("");const[email,setEmail]=useState("");const[pw,setPw]=useState("");
+  const[goal,setGoal]=useState("Build Muscle");const[loading,setLoading]=useState(false);
+  const[err,setErr]=useState("");const[info,setInfo]=useState("");
+  const GOALS=["Build Muscle","Lose Fat","Calisthenics Skills","Strength & Power","General Fitness"];
+  const submit=async()=>{
+    if(!email.trim()||!pw.trim()){setErr("Enter email and password.");return;}
+    if(mode==="signup"&&!name.trim()){setErr("Name required.");return;}
+    if(pw.length<6){setErr("Password must be 6+ characters.");return;}
+    setLoading(true);setErr("");setInfo("");
+    try{
+      if(mode==="signup"){
+        const r=await db.auth.signUp(email.trim(),pw,name.trim());
+        if(r.error){setErr(r.error.message);return;}
+        if(!r.session&&!r.access_token){setInfo("✅ Check email for confirmation, then Sign In.");setMode("login");setLoading(false);return;}
+        const tok=r.access_token||r.session?.access_token;const usr=r.user||r.session?.user;
+        if(usr&&tok){await db.from("profiles").update({goal,name:name.trim()},tok,`id=eq.${usr.id}`);onAuth(usr,tok,name.trim(),goal,{},r.refresh_token||r.session?.refresh_token);}
+        else{setInfo("✅ Confirmed! Sign In.");setMode("login");}
+      }else{
+        const r=await db.auth.signIn(email.trim(),pw);
+        if(r.error){const m=r.error.message||"";if(m.includes("Invalid login"))setErr("Wrong email or password.");else if(m.includes("Email not confirmed"))setErr("Confirm email first.");else setErr(m||"Sign in failed.");return;}
+        const tok=r.access_token;const usr=r.user;
+        if(!tok||!usr){setErr("Unexpected response.");return;}
+        const p=await db.from("profiles").select("*",tok,`&id=eq.${usr.id}`);
+        onAuth(usr,tok,p?.[0]?.name||email,p?.[0]?.goal||"Build Muscle",p?.[0]||{},r.refresh_token);
+      }
+    }catch(e){setErr("Network error — check internet and Supabase.");}
+    finally{setLoading(false);}
+  };
+  return(
+    <div className="screen" style={{display:"flex",alignItems:"center",justifyContent:"center",padding:18,background:`radial-gradient(ellipse at 70% 80%,${C.blue}07,transparent 55%),${C.bg}`}}>
+      <div style={{width:"100%",maxWidth:390}} className="fu">
+        <div style={{textAlign:"center",marginBottom:24}}>
+          <div style={{display:"inline-flex",alignItems:"center",gap:9,marginBottom:5}}>
+            <div style={{width:38,height:38,background:C.accent,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>⚡</div>
+            <span style={{fontWeight:800,fontSize:26,letterSpacing:1}}>APEX AI</span>
+          </div>
+          <p style={{color:C.t2,fontSize:12}}>{mode==="signup"?"Create your athlete profile":"Welcome back, athlete"}</p>
+        </div>
+        <div style={{display:"flex",background:C.surface,borderRadius:10,padding:3,marginBottom:16,border:`1px solid ${C.border}`}}>
+          {["login","signup"].map(m=>(<button key={m} onClick={()=>{setMode(m);setErr("");setInfo("");}} style={{flex:1,padding:"8px",borderRadius:8,background:mode===m?C.accent:"transparent",color:mode===m?C.bg:C.t2,fontWeight:700,fontSize:12,border:"none",cursor:"pointer",transition:"all .2s"}}>{m==="login"?"Sign In":"Sign Up"}</button>))}
+        </div>
+        {info&&<div className="pi" style={{background:C.accent+"18",border:`1px solid ${C.accent}35`,borderRadius:9,padding:"10px 12px",marginBottom:12,color:C.accent,fontSize:12,lineHeight:1.5}}>{info}</div>}
+        <Card>
+          <div style={{display:"flex",flexDirection:"column",gap:11}}>
+            {mode==="signup"&&<Inp label="Full Name" value={name} onChange={setName} placeholder="Alex Rodriguez"/>}
+            <Inp label="Email" type="email" value={email} onChange={setEmail} placeholder="you@example.com"/>
+            <Inp label="Password" type="password" value={pw} onChange={setPw} placeholder="Min 6 characters"/>
+            {mode==="signup"&&<div>
+              <label style={{fontSize:11,color:C.t2,fontWeight:700,letterSpacing:.7,textTransform:"uppercase",display:"block",marginBottom:7}}>Goal</label>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{GOALS.map(g=><button key={g} onClick={()=>setGoal(g)} style={{background:goal===g?C.accentD:C.surface,border:`1.5px solid ${goal===g?C.accent:C.border}`,color:goal===g?C.accent:C.t2,padding:"5px 10px",borderRadius:7,fontSize:10,fontWeight:700,cursor:"pointer"}}>{g}</button>)}</div>
+            </div>}
+            {err&&<div style={{color:C.red,fontSize:11,background:C.red+"14",border:`1px solid ${C.red}28`,padding:"9px 11px",borderRadius:8,lineHeight:1.5}}>{err}</div>}
+            <Btn onClick={submit} full loading={loading}>{mode==="login"?"Sign In":"Create Account"}</Btn>
+          </div>
+        </Card>
+        {mode==="signup"&&<p style={{color:C.t3,fontSize:10,textAlign:"center",marginTop:10,lineHeight:1.6}}>💡 Disable email confirmation: Supabase → Auth → Email → toggle off</p>}
+      </div>
+    </div>
+  );
+}
+
+const NAV=[{id:"home",icon:"🏠",label:"Home"},{id:"workout",icon:"💪",label:"Train"},{id:"nutrition",icon:"🥗",label:"Fuel"},{id:"photos",icon:"📸",label:"Photos"},{id:"reports",icon:"📊",label:"Stats"},{id:"ai",icon:"🤖",label:"Coach"}];
+function BottomNav({active,onNav}){
+  return(<div style={{position:"fixed",bottom:0,left:0,right:0,background:C.surface,borderTop:`1px solid ${C.border}`,display:"flex",zIndex:100}}>
+    {NAV.map(n=>(<button key={n.id} onClick={()=>onNav(n.id)} style={{flex:1,padding:"9px 0 7px",background:"transparent",display:"flex",flexDirection:"column",alignItems:"center",gap:2,border:"none",cursor:"pointer"}}>
+      <span style={{fontSize:16,filter:active===n.id?"none":"grayscale(1) opacity(.3)",transition:"filter .2s"}}>{n.icon}</span>
+      <span style={{fontSize:8,fontWeight:700,color:active===n.id?C.accent:C.t3,letterSpacing:.4,textTransform:"uppercase"}}>{n.label}</span>
+      {active===n.id&&<div style={{width:14,height:2,background:C.accent,borderRadius:1}}/>}
+    </button>))}
+  </div>);
+}
+function PhotosScreen({db,user,token}){
+  const[photos,setPhotos]=useState([]);const[loading,setLoading]=useState(true);
+  const[uploading,setUploading]=useState(false);const[caption,setCaption]=useState("");
+  const[viewPhoto,setViewPhoto]=useState(null);const[compareA,setCompareA]=useState(null);const[compareB,setCompareB]=useState(null);
+  const[showCompare,setShowCompare]=useState(false);const[shareModal,setShareModal]=useState(null);const[deleting,setDeleting]=useState(false);
+  const cameraRef=useRef(null);const galleryRef=useRef(null);
+  const load=useCallback(async()=>{setLoading(true);const p=await db.from("progress_photos").select("*",token,`&user_id=eq.${user.id}&order=taken_at.desc`);setPhotos(Array.isArray(p)?p:[]);setLoading(false);},[db,token,user.id]);
+  useEffect(()=>{load();},[load]);
+  const handleFile=async(file)=>{
+    if(!file)return;if(!file.type.startsWith("image/")){alert("Please select an image file.");return;}if(file.size>15*1024*1024){alert("Image too large (max 15MB).");return;}
+    setUploading(true);try{const compressed=await compressImage(file,1200,0.75);await db.from("progress_photos").insert({user_id:user.id,photo_data:compressed,caption:caption.trim()||null},token);setCaption("");await load();}catch(e){alert("Upload failed: "+e.message);}finally{setUploading(false);}
+  };
+  const deletePhoto=async(id)=>{setDeleting(true);await db.from("progress_photos").del(token,`id=eq.${id}`);setViewPhoto(null);await load();setDeleting(false);};
+  const handleNativeShare=async(photo)=>{
+    if(navigator.share){try{const res=await fetch(photo.photo_data);const blob=await res.blob();const file=new File([blob],"apex-progress.jpg",{type:"image/jpeg"});if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:"My Fitness Progress",text:(photo.caption||"My fitness progress")+"\n\n💪 Tracked with APEX AI"});return;}}catch(e){}}
+    setShareModal(photo);
+  };
+  const grouped=useMemo(()=>{const m={};photos.forEach(p=>{const d=new Date(p.taken_at);const k=d.toLocaleDateString("en",{month:"long",year:"numeric"});if(!m[k])m[k]=[];m[k].push(p);});return m;},[photos]);
+  return(<div className="screen"><div style={{padding:"48px 16px 0"}}>
+    <div className="fu" style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:14}}>
+      <div><h1 style={{fontSize:30,fontWeight:800,letterSpacing:1}}>PROGRESS</h1><p style={{color:C.t2,fontSize:11}}>{photos.length} photos · your transformation</p></div>
+      {photos.length>=2&&<Btn onClick={()=>setShowCompare(true)} sm color={C.purple} outline>⚖️ Compare</Btn>}
+    </div>
+    <Card glow sx={{marginBottom:14}} className="fu">
+      <p style={{fontWeight:800,fontSize:13,marginBottom:11}}>📸 Add Progress Photo</p>
+      <Inp label="Caption (optional)" value={caption} onChange={setCaption} placeholder="e.g. Week 4 — Front pose"/>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginTop:10}}>
+        <button onClick={()=>cameraRef.current?.click()} disabled={uploading} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:7,background:`linear-gradient(135deg,${C.accent}18,${C.blue}18)`,border:`2px dashed ${C.accent}50`,borderRadius:12,padding:"18px 10px",cursor:"pointer",color:C.accent}}>
+          {uploading?<Spin s={22} c={C.accent}/>:<span style={{fontSize:28}}>📷</span>}<span style={{fontWeight:800,fontSize:12}}>{uploading?"Uploading...":"Camera"}</span><span style={{fontSize:9,color:C.t2}}>Take new photo</span>
+        </button>
+        <button onClick={()=>galleryRef.current?.click()} disabled={uploading} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:7,background:`linear-gradient(135deg,${C.purple}18,${C.pink}18)`,border:`2px dashed ${C.purple}50`,borderRadius:12,padding:"18px 10px",cursor:"pointer",color:C.purple}}>
+          {uploading?<Spin s={22} c={C.purple}/>:<span style={{fontSize:28}}>��️</span>}<span style={{fontWeight:800,fontSize:12}}>{uploading?"Uploading...":"Gallery"}</span><span style={{fontSize:9,color:C.t2}}>Choose from library</span>
+        </button>
+      </div>
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={e=>{handleFile(e.target.files?.[0]);e.target.value="";}}/>
+      <input ref={galleryRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{handleFile(e.target.files?.[0]);e.target.value="";}}/>
+      <p style={{fontSize:9,color:C.t3,textAlign:"center",marginTop:8}}>Photos compressed automatically · max 15MB</p>
+    </Card>
+    {loading?<div style={{display:"flex",justifyContent:"center",padding:28}}><Spin s={26}/></div>
+      :photos.length===0?<Card sx={{textAlign:"center",padding:36}}><div style={{fontSize:48,marginBottom:12}}>📸</div><h3 style={{fontWeight:800,marginBottom:7}}>No photos yet</h3><p style={{color:C.t2,fontSize:12,lineHeight:1.6}}>Take a photo today and start tracking your transformation!</p></Card>
+      :<div className="fu">{Object.entries(grouped).map(([month,mPhotos])=>(<div key={month} style={{marginBottom:18}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}><div style={{height:1,flex:1,background:C.border}}/><span style={{fontSize:11,color:C.t2,fontWeight:700,flexShrink:0}}>{month}</span><div style={{height:1,flex:1,background:C.border}}/></div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
+            {mPhotos.map(p=>(<div key={p.id} onClick={()=>setViewPhoto(p)} style={{aspectRatio:"1",borderRadius:10,overflow:"hidden",cursor:"pointer",position:"relative",border:`1px solid ${C.border}`}}>
+              <img src={p.photo_data} alt={p.caption||"Progress"} style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+              {p.caption&&<div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(transparent,#000A)",padding:"12px 5px 5px",fontSize:8,color:"#fff",fontWeight:700,lineHeight:1.3,textAlign:"center"}}>{p.caption.slice(0,25)}{p.caption.length>25?"...":""}</div>}
+            </div>))}
+          </div>
+        </div>))}</div>}
+  </div>
+  {viewPhoto&&(<div className="fi" style={{position:"fixed",inset:0,background:"#000F",zIndex:400,display:"flex",flexDirection:"column"}}>
+    <div style={{padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+      <button onClick={()=>setViewPhoto(null)} style={{background:C.card,border:`1px solid ${C.border}`,color:C.t1,borderRadius:9,padding:"7px 14px",cursor:"pointer",fontWeight:700,fontSize:12}}>← Back</button>
+      <span style={{color:C.t2,fontSize:10}}>{new Date(viewPhoto.taken_at).toLocaleDateString("en",{day:"numeric",month:"short",year:"numeric"})}</span>
+      <button onClick={()=>deletePhoto(viewPhoto.id)} disabled={deleting} style={{background:C.red+"20",border:`1px solid ${C.red}40`,color:C.red,borderRadius:9,padding:"7px 12px",cursor:"pointer",fontWeight:700,fontSize:11}}>{deleting?<Spin s={12} c={C.red}/>:"🗑 Delete"}</button>
+    </div>
+    <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:"0 16px",overflow:"hidden"}}><img src={viewPhoto.photo_data} alt={viewPhoto.caption||"Progress"} style={{maxWidth:"100%",maxHeight:"100%",objectFit:"contain",borderRadius:12}}/></div>
+    {viewPhoto.caption&&<div style={{padding:"10px 20px",textAlign:"center",color:C.t2,fontSize:12,fontStyle:"italic",flexShrink:0}}>{viewPhoto.caption}</div>}
+    <div style={{padding:"12px 16px 24px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,flexShrink:0}}>
+      <button onClick={()=>downloadImage(viewPhoto.photo_data,`apex-progress-${new Date(viewPhoto.taken_at).toISOString().split("T")[0]}.jpg`)} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:C.accent,border:"none",borderRadius:11,padding:"13px",color:C.bg,fontWeight:800,fontSize:13,cursor:"pointer"}}>⬇️ Download</button>
+      <button onClick={()=>handleNativeShare(viewPhoto)} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,background:C.purple,border:"none",borderRadius:11,padding:"13px",color:C.bg,fontWeight:800,fontSize:13,cursor:"pointer"}}>↗ Share</button>
+    </div>
+  </div>)}
+  {shareModal&&(<Modal title="↗ Share Progress Photo" onClose={()=>setShareModal(null)}>
+    <div style={{borderRadius:11,overflow:"hidden",marginBottom:14,maxHeight:220,display:"flex",alignItems:"center",background:"#000"}}><img src={shareModal.photo_data} alt="progress" style={{width:"100%",objectFit:"contain",maxHeight:220}}/></div>
+    {shareModal.caption&&<p style={{color:C.t2,fontSize:12,marginBottom:12,textAlign:"center",fontStyle:"italic"}}>"{shareModal.caption}"</p>}
+    <SocialShareRow onShare={(platform)=>shareImageToSocial(platform,shareModal.photo_data,shareModal.caption||"My fitness progress 💪 #APEXAI")}/>
+    <div style={{marginTop:12}}><Btn onClick={()=>downloadImage(shareModal.photo_data,`apex-progress-${Date.now()}.jpg`)} outline full color={C.accent}>⬇️ Download Photo</Btn></div>
+  </Modal>)}
+  {showCompare&&(<Modal title="⚖️ Before & After Compare" onClose={()=>{setShowCompare(false);setCompareA(null);setCompareB(null);}}>
+    <p style={{fontSize:11,color:C.t2,marginBottom:12}}>Select two photos to compare side by side:</p>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+      {[["Before",compareA,setCompareA],["After",compareB,setCompareB]].map(([label,sel,setSel])=>(<div key={label}>
+        <p style={{fontSize:10,color:C.t2,fontWeight:700,marginBottom:7,textTransform:"uppercase",letterSpacing:.6}}>{label}</p>
+        {sel?<div style={{position:"relative",borderRadius:9,overflow:"hidden"}}><img src={sel.photo_data} alt={label} style={{width:"100%",aspectRatio:"1",objectFit:"cover"}}/><button onClick={()=>setSel(null)} style={{position:"absolute",top:4,right:4,background:"#000A",border:"none",color:"#fff",borderRadius:5,padding:"2px 6px",cursor:"pointer",fontSize:11}}>×</button></div>
+        :<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,maxHeight:200,overflowY:"auto"}}>{photos.map(p=>(<div key={p.id} onClick={()=>setSel(p)} style={{aspectRatio:"1",borderRadius:6,overflow:"hidden",cursor:"pointer",border:`1px solid ${C.border}`}}><img src={p.photo_data} alt="thumb" style={{width:"100%",height:"100%",objectFit:"cover"}}/></div>))}</div>}
+      </div>))}
+    </div>
+    {compareA&&compareB&&(<div style={{marginTop:8}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}>
+        {[[compareA,"Before"],[compareB,"After"]].map(([p,label])=>(<div key={label}>
+          <div style={{background:label==="Before"?C.orange+"20":C.accent+"20",borderRadius:7,padding:"4px 8px",marginBottom:5,textAlign:"center"}}><span style={{fontSize:10,fontWeight:800,color:label==="Before"?C.orange:C.accent}}>{label}</span><div style={{fontSize:9,color:C.t3}}>{new Date(p.taken_at).toLocaleDateString()}</div></div>
+          <img src={p.photo_data} alt={label} style={{width:"100%",aspectRatio:"1",objectFit:"cover",borderRadius:9}}/>
+        </div>))}
+      </div>
+      <Btn onClick={()=>shareText("whatsapp",`My fitness transformation with APEX AI! 💪\nBefore: ${new Date(compareA.taken_at).toLocaleDateString()} → After: ${new Date(compareB.taken_at).toLocaleDateString()}\n#fitness #transformation #apexai`)} outline full sm color={C.accent}>↗ Share Comparison</Btn>
+    </div>)}
+  </Modal>)}
+  </div>);
+}
+function StreakCalendar({logs}){
+  const workoutDates=useMemo(()=>new Set(logs.map(l=>l.completed_at?.split("T")[0])),[logs]);
+  const intensityMap=useMemo(()=>{const m={};logs.forEach(l=>{const d=l.completed_at?.split("T")[0];if(d)m[d]=l.intensity||"moderate";});return m;},[logs]);
+  const today=new Date();const start=new Date(today);start.setDate(today.getDate()-27);
+  while(start.getDay()!==0)start.setDate(start.getDate()-1);
+  const weeks=[];let day=new Date(start);
+  for(let w=0;w<5;w++){const wk=[];for(let d=0;d<7;d++){wk.push(new Date(day));day.setDate(day.getDate()+1);}weeks.push(wk);}
+  const getColor=date=>{const ds=date.toISOString().split("T")[0];const isToday=date.toDateString()===today.toDateString();const isSun=date.getDay()===0;const has=workoutDates.has(ds);const intens=intensityMap[ds];
+    if(isSun)return{bg:C.surface,border:C.border};
+    if(has){if(intens==="heavy")return{bg:C.orange+"40",border:C.orange};if(intens==="light")return{bg:C.accent+"25",border:C.accent+"60"};return{bg:C.blue+"30",border:C.blue};}
+    if(isToday)return{bg:C.accentD,border:C.accent+"60"};if(date<today)return{bg:C.surface,border:C.border};return{bg:"transparent",border:C.border+"40"};};
+  return(<Card sx={{marginBottom:14}}>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+      <p style={{fontWeight:800,fontSize:13}}>Training Calendar</p>
+      <div style={{display:"flex",gap:8}}>{[["Heavy",C.orange],["Moderate",C.blue],["Light",C.accent]].map(([l,c])=>(<div key={l} style={{display:"flex",alignItems:"center",gap:3}}><div style={{width:6,height:6,borderRadius:2,background:c}}/><span style={{fontSize:8,color:C.t3}}>{l}</span></div>))}</div>
+    </div>
+    <div style={{display:"flex",gap:2,marginBottom:4}}>{["S","M","T","W","T","F","S"].map((d,i)=><div key={i} style={{flex:1,textAlign:"center",fontSize:8,color:i===0?C.t3:C.t2,fontWeight:700}}>{d}</div>)}</div>
+    <div style={{display:"flex",flexDirection:"column",gap:2}}>{weeks.map((week,wi)=>(<div key={wi} style={{display:"flex",gap:2}}>{week.map((date,di)=>{const sc=getColor(date);const isToday=date.toDateString()===today.toDateString();return<div key={di} title={date.toLocaleDateString()} style={{flex:1,aspectRatio:"1",borderRadius:4,background:sc.bg,border:`1px solid ${sc.border}`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:isToday?`0 0 6px ${C.accent}40`:"none",transition:"all .2s"}}>{isToday&&<div style={{width:4,height:4,borderRadius:"50%",background:C.accent}}/>}</div>;})}
+    </div>))}</div>
+    <p style={{fontSize:9,color:C.t3,textAlign:"center",marginTop:6}}>☀️ Sundays = rest days</p>
+  </Card>);
+}
+
+function HomeScreen({db,user,token,profile,onNav,onStartWorkout,aiKey}){
+  const[logs,setLogs]=useState([]);const[wkts,setWkts]=useState([]);const[nLogs,setNLogs]=useState([]);const[waterLogs,setWaterLogs]=useState([]);const[bwLogs,setBwLogs]=useState([]);const[loading,setLoading]=useState(true);
+  const[addWater,setAddWater]=useState(false);const[waterAmt,setWaterAmt]=useState("250");const[savingWater,setSavingWater]=useState(false);
+  const[suggestion,setSuggestion]=useState("");const[loadingSug,setLoadingSug]=useState(false);
+  const today=new Date().toLocaleDateString("en-CA");
+  useEffect(()=>{(async()=>{setLoading(true);const[l,w,n,wa,bw]=await Promise.all([db.from("workout_logs").select("*",token,`&user_id=eq.${user.id}&order=completed_at.desc&limit=14`),db.from("workouts").select("*,exercises(*)",token,`&user_id=eq.${user.id}&order=created_at.desc`),db.from("nutrition_logs").select("*",token,`&user_id=eq.${user.id}&logged_at=gte.${today}T00:00:00`),db.from("water_logs").select("*",token,`&user_id=eq.${user.id}&logged_at=gte.${today}T00:00:00&order=logged_at.asc`),db.from("body_weight_logs").select("*",token,`&user_id=eq.${user.id}&order=logged_at.desc&limit=3`)]);setLogs(Array.isArray(l)?l:[]);setWkts(Array.isArray(w)?w:[]);setNLogs(Array.isArray(n)?n:[]);setWaterLogs(Array.isArray(wa)?wa:[]);setBwLogs(Array.isArray(bw)?bw:[]);setLoading(false);})();},[db,token,user.id,today]);
+  useEffect(()=>{if(loading)return;setLoadingSug(true);const last=logs.slice(0,3).map(l=>l.workout_name).join(", ")||"none";const day=new Date().toLocaleDateString("en",{weekday:"long"});callAI(`Athlete goal: ${profile?.goal||"Build Muscle"}. Recent workouts: ${last}. Today is ${day}. Suggest one workout in 1 sentence. Max 25 words. Name specific muscles.`,aiKey).then(r=>setSuggestion(r.trim())).catch(()=>setSuggestion("Focus on compound lifts — squat, bench, or deadlift today.")).finally(()=>setLoadingSug(false));},[loading]);
+  const logWater=async()=>{if(!waterAmt)return;const ml=+waterAmt;if(!ml||ml<=0)return;const tempEntry={id:"temp_"+Date.now(),user_id:user.id,amount_ml:ml,logged_at:new Date().toISOString()};setWaterLogs(prev=>[...prev,tempEntry]);setWaterAmt("250");setAddWater(false);setSavingWater(true);try{const res=await db.from("water_logs").insert({user_id:user.id,amount_ml:ml},token);const realId=Array.isArray(res)?res[0]?.id:res?.id;if(realId)setWaterLogs(prev=>prev.map(w=>w.id===tempEntry.id?{...w,id:realId}:w));}catch(e){setWaterLogs(prev=>prev.filter(w=>w.id!==tempEntry.id));}finally{setSavingWater(false);}};
+  const streak=useMemo(()=>{const dates=new Set(logs.map(l=>l.completed_at?.split("T")[0]));let s=0;const now=new Date();for(let i=0;i<60;i++){const d=new Date(now);d.setDate(d.getDate()-i);if(d.getDay()===0)continue;if(dates.has(d.toISOString().split("T")[0]))s++;else if(i>0)break;}return s;},[logs]);
+  const todayCal=nLogs.reduce((a,l)=>a+(l.calories||0),0);const calGoal=profile?.calorie_goal||2000;
+  const totalWater=waterLogs.reduce((a,w)=>a+(w.amount_ml||0),0);const waterGoal=profile?.water_goal_ml||2500;
+  const latestBW=bwLogs[0]?.weight_kg;const hour=new Date().getHours();const greet=hour<12?"Morning":hour<17?"Afternoon":"Evening";const firstName=(profile?.name||user?.email||"Athlete").split(" ")[0];
+  const suggestedWorkout=useMemo(()=>{if(!wkts.length)return null;const last=new Set(logs.slice(0,3).map(l=>l.workout_name));return wkts.find(w=>!last.has(w.name))||wkts[0];},[wkts,logs]);
+  return(<div className="screen" style={{background:`radial-gradient(ellipse at 50% -10%,${C.accent}07,transparent 50%),${C.bg}`}}><div style={{padding:"48px 16px 0"}}>
+    <div className="fu" style={{marginBottom:16}}>
+      <p style={{color:C.t2,fontSize:12,marginBottom:2}}>Good {greet},</p>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+        <h1 style={{fontSize:32,fontWeight:800,letterSpacing:1,lineHeight:1}}>{firstName.toUpperCase()}</h1>
+        {streak>0&&<div style={{background:`linear-gradient(135deg,${C.orange},${C.red})`,borderRadius:12,padding:"6px 12px",display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:16}}>🔥</span><div><div style={{fontWeight:800,fontSize:15,color:"#fff",fontFamily:"'DM Mono'"}}>{streak}</div><div style={{fontSize:7,color:"rgba(255,255,255,.7)",fontWeight:700}}>DAY STREAK</div></div></div>}
+      </div>
+      <div style={{display:"flex",gap:7,flexWrap:"wrap"}}><Tag color={C.accent}>{profile?.goal||"Build Muscle"}</Tag>{latestBW&&<Tag color={C.blue}>⚖️ {latestBW}kg</Tag>}</div>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:14}} className="fu">
+      <Card sx={{padding:12}} glow color={C.orange}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:7}}><div><div style={{fontSize:9,color:C.t2,fontWeight:700,textTransform:"uppercase",letterSpacing:.6,marginBottom:2}}>Calories</div><div style={{fontFamily:"'DM Mono'",fontSize:21,fontWeight:800,color:C.orange}}>{loading?"—":todayCal}<span style={{fontSize:9,color:C.t3}}>/{calGoal}</span></div></div><span style={{fontSize:19}}>🔥</span></div><div style={{height:3,background:C.border,borderRadius:2}}><div style={{height:"100%",width:`${Math.min(100,(todayCal/calGoal)*100)}%`,background:C.orange,borderRadius:2,transition:"width .5s"}}/></div><div style={{fontSize:9,color:C.t3,marginTop:3}}>{Math.round((todayCal/calGoal)*100)}% of goal</div></Card>
+      <Card sx={{padding:12}} glow color={C.blue}><div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:7}}><div><div style={{fontSize:9,color:C.t2,fontWeight:700,textTransform:"uppercase",letterSpacing:.6,marginBottom:2}}>Hydration</div><div style={{fontFamily:"'DM Mono'",fontSize:21,fontWeight:800,color:C.blue}}>{loading?"—":(totalWater/1000).toFixed(1)}<span style={{fontSize:9,color:C.t3}}>/{(waterGoal/1000).toFixed(1)}L</span></div></div><span style={{fontSize:19}}>💧</span></div><div style={{height:3,background:C.border,borderRadius:2}}><div style={{height:"100%",width:`${Math.min(100,(totalWater/waterGoal)*100)}%`,background:C.blue,borderRadius:2,transition:"width .5s"}}/></div><button onClick={()=>setAddWater(true)} style={{marginTop:5,width:"100%",background:C.blue+"18",border:"none",borderRadius:6,padding:"4px",fontSize:9,color:C.blue,fontWeight:700,cursor:"pointer"}}>+ Log Water</button></Card>
+    </div>
+    {addWater&&<Card className="pi" sx={{marginBottom:12,border:`1px solid ${C.blue}35`}}><p style={{fontWeight:700,fontSize:12,marginBottom:9,color:C.blue}}>💧 Log Water</p><div style={{display:"flex",gap:6,marginBottom:9,flexWrap:"wrap"}}>{["150","250","330","500","750","1000"].map(ml=>(<button key={ml} onClick={()=>setWaterAmt(ml)} style={{flex:1,padding:"7px 2px",borderRadius:7,background:waterAmt===ml?C.blue+"28":C.surface,border:`1.5px solid ${waterAmt===ml?C.blue:C.border}`,color:waterAmt===ml?C.blue:C.t2,fontSize:10,fontWeight:700,cursor:"pointer",minWidth:40}}>{ml}ml</button>))}</div><div style={{display:"flex",gap:8}}><Btn onClick={()=>setAddWater(false)} outline sm full color={C.t2}>Cancel</Btn><Btn onClick={logWater} full loading={savingWater} sm color={C.blue}>Log 💧</Btn></div></Card>}
+    <Card glow sx={{marginBottom:14,background:`linear-gradient(135deg,${C.purple}08,${C.bg})`}} className="fu"><div style={{display:"flex",alignItems:"flex-start",gap:10,marginBottom:suggestedWorkout?10:0}}><div style={{width:36,height:36,borderRadius:9,background:`linear-gradient(135deg,${C.purple},${C.blue})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:17,flexShrink:0}}>🤖</div><div style={{flex:1}}><div style={{fontSize:9,color:C.t3,fontWeight:700,textTransform:"uppercase",letterSpacing:.6,marginBottom:3}}>Today's AI Suggestion</div>{loadingSug?<div style={{display:"flex",alignItems:"center",gap:7}}><Spin s={11} c={C.purple}/><span style={{color:C.t2,fontSize:11}}>Analyzing...</span></div>:<p style={{fontSize:12,color:C.t1,lineHeight:1.6}}>{suggestion||"Ready to train!"}</p>}</div></div>{suggestedWorkout&&<button onClick={()=>onStartWorkout(suggestedWorkout)} style={{width:"100%",background:C.accent,border:"none",borderRadius:9,padding:"9px",color:C.bg,fontWeight:800,fontSize:12,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:7}}>▶ Start: {suggestedWorkout.name}</button>}</Card>
+    <div className="fu"><StreakCalendar logs={logs}/></div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}} className="fu">{[[logs.length,"Sessions","🏋️",C.accent],[Math.round(logs.reduce((a,l)=>a+(l.total_volume||0),0))+"kg","Volume","📈",C.blue],[logs.reduce((a,l)=>a+(l.duration_min||0),0)+"m","Time","⏱",C.purple]].map(([v,l,i,c])=>(<Card key={l} sx={{textAlign:"center",padding:11}}><div style={{fontSize:16,marginBottom:3}}>{i}</div><div style={{fontSize:15,fontWeight:800,color:c,fontFamily:"'DM Mono'"}}>{loading?"—":v}</div><div style={{fontSize:9,color:C.t3,fontWeight:700,letterSpacing:.5,textTransform:"uppercase"}}>{l}</div></Card>))}</div>
+    <h3 style={{fontWeight:700,marginBottom:10,fontSize:14}} className="fu">Recent Sessions</h3>
+    {loading?<div style={{display:"flex",justifyContent:"center",padding:18}}><Spin s={26}/></div>:logs.length===0?<Card><p style={{color:C.t3,textAlign:"center",fontSize:12}}>No sessions yet. Start your first workout!</p></Card>:<div style={{display:"flex",flexDirection:"column",gap:7}} className="fu">{logs.slice(0,4).map(l=>{const ic={light:C.accent,moderate:C.blue,heavy:C.orange}[l.intensity||"moderate"]||C.blue;return<Card key={l.id} sx={{display:"flex",alignItems:"center",gap:11}}><div style={{width:36,height:36,borderRadius:8,background:ic+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>💪</div><div style={{flex:1}}><div style={{fontWeight:700,fontSize:12,marginBottom:1}}>{l.workout_name||"Workout"}</div><div style={{color:C.t3,fontSize:10}}>{new Date(l.completed_at).toLocaleDateString()} · {l.duration_min||0}min · {Math.round(l.total_volume||0)}kg</div></div><Tag color={ic}>{l.intensity||"moderate"}</Tag></Card>;})}</div>}
+  </div></div>);
+}
+function WorkoutScreen({db,user,token,onStartWorkout,aiKey}){
+  const[workouts,setWorkouts]=useState([]);const[loading,setLoading]=useState(true);const[showCreate,setShowCreate]=useState(false);const[showAI,setShowAI]=useState(false);const[detail,setDetail]=useState(null);const[shareWkt,setShareWkt]=useState(null);
+  const load=useCallback(async()=>{setLoading(true);const w=await db.from("workouts").select("*,exercises(*)",token,`&user_id=eq.${user.id}&order=created_at.desc`);setWorkouts(Array.isArray(w)?w:[]);setLoading(false);},[db,token,user.id]);
+  useEffect(()=>{load();},[load]);
+  const del=async(id)=>{await db.from("workouts").del(token,`id=eq.${id}`);setDetail(null);load();};
+  const TC={Gym:C.blue,Calisthenics:C.accent,HIIT:C.orange,Mobility:C.purple};
+  return(<div className="screen"><div style={{padding:"48px 16px 0"}}>
+    <div className="fu" style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:18}}><div><h1 style={{fontSize:30,fontWeight:800,letterSpacing:1}}>WORKOUTS</h1><p style={{color:C.t2,fontSize:11}}>{workouts.length} programs</p></div><div style={{display:"flex",gap:7}}><Btn onClick={()=>setShowAI(true)} sm color={C.purple}>✨ AI</Btn><Btn onClick={()=>setShowCreate(true)} sm>+ New</Btn></div></div>
+    {loading?<div style={{display:"flex",justifyContent:"center",padding:36}}><Spin s={26}/></div>:workouts.length===0?<div className="fu" style={{textAlign:"center",padding:36}}><div style={{fontSize:40,marginBottom:12}}>💪</div><h3 style={{marginBottom:7,fontWeight:800}}>No workouts yet</h3><div style={{display:"flex",gap:9,justifyContent:"center"}}><Btn onClick={()=>setShowCreate(true)} sm>+ Manual</Btn><Btn onClick={()=>setShowAI(true)} sm color={C.purple}>✨ AI</Btn></div></div>
+    :<div style={{display:"flex",flexDirection:"column",gap:9}} className="fu">{workouts.map(w=>(<Card key={w.id} sx={{cursor:"pointer"}} onClick={()=>setDetail(w)}><div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:8}}><div><div style={{fontWeight:800,fontSize:14,marginBottom:4}}>{w.name}</div><Tag color={TC[w.type]||C.blue}>{w.type}</Tag></div><div style={{display:"flex",gap:6}}><button onClick={e=>{e.stopPropagation();setShareWkt(w);}} style={{background:C.purple+"18",color:C.purple,border:"none",borderRadius:8,padding:"6px 10px",fontSize:12,cursor:"pointer",fontWeight:700}}>↗</button><button onClick={e=>{e.stopPropagation();onStartWorkout(w);}} style={{background:C.accent,color:C.bg,border:"none",borderRadius:8,padding:"6px 13px",fontWeight:800,fontSize:11,cursor:"pointer"}}>▶</button></div></div><div style={{color:C.t3,fontSize:10}}>{w.exercises?.length||0} exercises · {new Date(w.created_at).toLocaleDateString()}</div>{w.exercises?.length>0&&<div style={{marginTop:8,display:"flex",flexWrap:"wrap",gap:5}}>{w.exercises.slice(0,4).map(e=><span key={e.id} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:5,padding:"2px 7px",fontSize:9,color:C.t2}}>{e.name}</span>)}{w.exercises.length>4&&<span style={{color:C.t3,fontSize:9}}> +{w.exercises.length-4}</span>}</div>}</Card>))}</div>}
+  </div>
+  {showCreate&&<CreateWorkoutModal db={db} user={user} token={token} onClose={()=>{setShowCreate(false);load();}}/>}
+  {showAI&&<AIGeneratorModal db={db} user={user} token={token} aiKey={aiKey} onClose={()=>setShowAI(false)} onSaved={load}/>}
+  {shareWkt&&<ShareWorkoutModal workout={shareWkt} onClose={()=>setShareWkt(null)}/>}
+  {detail&&(<Modal title={detail.name} onClose={()=>setDetail(null)}><Tag color={TC[detail.type]||C.blue}>{detail.type}</Tag><div style={{display:"flex",flexDirection:"column",gap:7,margin:"12px 0"}}>{(detail.exercises||[]).map((e,i)=>(<div key={e.id} style={{background:C.surface,borderRadius:8,padding:"8px 12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}><div><div style={{fontWeight:700,fontSize:12}}>{e.name}</div><div style={{color:C.t3,fontSize:10}}>{e.sets}×{e.reps}{e.target_weight?` @ ${e.target_weight}kg`:""}</div></div><span style={{color:C.t3,fontSize:11}}>#{i+1}</span></div>))}</div><Btn onClick={()=>{setDetail(null);onStartWorkout(detail);}} full sx={{marginBottom:8}}>▶ Start Workout</Btn><Btn onClick={()=>setShareWkt(detail)} outline full sm color={C.purple} sx={{marginBottom:8}}>↗ Share Routine</Btn><Btn onClick={()=>del(detail.id)} outline full sm color={C.red}>Delete</Btn></Modal>)}
+  </div>);
+}
+
+function ShareWorkoutModal({workout,onClose}){
+  const[copied,setCopied]=useState(false);const exList=(workout.exercises||[]).map(e=>`• ${e.name} — ${e.sets}×${e.reps}${e.target_weight?` @ ${e.target_weight}kg`:""}`).join("\n");
+  const text=`💪 My ${workout.name} Workout\n\n${exList}\n\n🔥 Trained with APEX AI Fitness Coach\n#fitness #workout #gains`;
+  return(<Modal title="↗ Share Workout" onClose={onClose}><div style={{background:C.surface,borderRadius:9,padding:12,marginBottom:12,fontSize:11,color:C.t1,lineHeight:1.7,whiteSpace:"pre-wrap",fontFamily:"'DM Mono',monospace",maxHeight:140,overflow:"auto"}}>{text}</div><SocialShareRow onShare={(p)=>shareText(p,text)}/><div style={{marginTop:10}}><Btn onClick={()=>{navigator.clipboard.writeText(text);setCopied(true);setTimeout(()=>setCopied(false),2000);}} full outline color={C.accent}>{copied?"✓ Copied!":"📋 Copy Text"}</Btn></div></Modal>);
+}
+
+function CreateWorkoutModal({db,user,token,onClose}){
+  const[name,setName]=useState("");const[type,setType]=useState("Gym");const[exs,setExs]=useState([{name:"",sets:"3",reps:"8-12",target_weight:""}]);const[loading,setLoading]=useState(false);const[err,setErr]=useState("");
+  const TYPES=["Gym","Calisthenics","HIIT","Mobility"];
+  const addEx=()=>setExs(p=>[...p,{name:"",sets:"3",reps:"8-12",target_weight:""}]);const remEx=i=>setExs(p=>p.filter((_,x)=>x!==i));const upd=(i,f,v)=>setExs(p=>p.map((e,x)=>x===i?{...e,[f]:v}:e));
+  const save=async()=>{if(!name.trim()){setErr("Name required.");return;}const vx=exs.filter(e=>e.name.trim());if(!vx.length){setErr("Add at least 1 exercise.");return;}setLoading(true);const w=await db.from("workouts").insert({user_id:user.id,name:name.trim(),type},token);const wId=Array.isArray(w)?w[0]?.id:w?.id;if(wId)await db.from("exercises").insert(vx.map(e=>({workout_id:wId,name:e.name.trim(),sets:+e.sets||3,reps:e.reps||"8-12",target_weight:e.target_weight?+e.target_weight:null})),token);setLoading(false);onClose();};
+  return(<Modal title="New Workout" onClose={onClose}><div style={{display:"flex",flexDirection:"column",gap:11}}><Inp label="Workout Name" value={name} onChange={setName} placeholder="Push Day A"/><div><label style={{fontSize:11,color:C.t2,fontWeight:700,letterSpacing:.7,textTransform:"uppercase",display:"block",marginBottom:6}}>Type</label><div style={{display:"flex",gap:6}}>{TYPES.map(t=><button key={t} onClick={()=>setType(t)} style={{flex:1,padding:"7px 3px",borderRadius:7,background:type===t?C.accentD:C.surface,border:`1.5px solid ${type===t?C.accent:C.border}`,color:type===t?C.accent:C.t2,fontSize:10,fontWeight:700,cursor:"pointer"}}>{t}</button>)}</div></div>
+  <div><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}><label style={{fontSize:11,color:C.t2,fontWeight:700,letterSpacing:.7,textTransform:"uppercase"}}>Exercises</label><button onClick={addEx} style={{background:C.accentD,border:`1px solid ${C.accent}35`,color:C.accent,borderRadius:6,padding:"3px 10px",fontSize:10,fontWeight:700,cursor:"pointer"}}>+ Add</button></div>
+  <div style={{display:"flex",flexDirection:"column",gap:8}}>{exs.map((ex,i)=>(<div key={i} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:10}}><div style={{display:"flex",gap:6,marginBottom:6}}><input value={ex.name} onChange={e=>upd(i,"name",e.target.value)} placeholder="Exercise name" style={{flex:1,background:C.card,border:`1px solid ${C.border}`,borderRadius:6,padding:"6px 8px",color:C.t1,fontSize:11,outline:"none",fontFamily:"'Syne'"}}/><button onClick={()=>remEx(i)} style={{background:C.red+"18",color:C.red,border:"none",borderRadius:6,padding:"6px 9px",cursor:"pointer",fontSize:11}}>✕</button></div><div style={{display:"flex",gap:6}}>{[["Sets","sets"],["Reps","reps"],["Target(kg)","target_weight"]].map(([l,f])=>(<div key={f} style={{flex:1}}><div style={{fontSize:9,color:C.t3,marginBottom:2,fontWeight:700}}>{l}</div><input value={ex[f]} onChange={e=>upd(i,f,e.target.value)} style={{width:"100%",background:C.card,border:`1px solid ${C.border}`,borderRadius:6,padding:"5px 6px",color:C.t1,fontSize:11,outline:"none",fontFamily:"'Syne'"}}/></div>))}</div></div>))}</div></div>
+  {err&&<p style={{color:C.red,fontSize:11,background:C.red+"14",padding:"7px 10px",borderRadius:7}}>{err}</p>}<Btn onClick={save} full loading={loading}>Save Workout</Btn></div></Modal>);
+}
+
+function AIGeneratorModal({db,user,token,onClose,onSaved,aiKey}){
+  const[goal,setGoal]=useState("Build Muscle");const[level,setLevel]=useState("Intermediate");const[equip,setEquip]=useState("Full Gym");const[focus,setFocus]=useState("Push");const[loading,setLoading]=useState(false);const[result,setResult]=useState(null);const[err,setErr]=useState("");const[saved,setSaved]=useState(false);
+  const generate=async()=>{setLoading(true);setErr("");setResult(null);const prompt=`You are a fitness coach. Create a ${goal} workout for a ${level} using ${equip}. Focus: ${focus}. Reply with ONLY valid JSON no markdown: {"name":"Workout Name","type":"Gym","exercises":[{"name":"Exercise","sets":3,"reps":"8-12","target_weight":"60"}]} Include 6 exercises. type: Gym, Calisthenics, or HIIT.`;try{const raw=await callAI(prompt,aiKey);const parsed=extractJSON(raw);if(!parsed.name||!Array.isArray(parsed.exercises))throw new Error("Invalid AI response");setResult(parsed);}catch(e){setErr(e.message);}finally{setLoading(false);}};
+  const save=async()=>{setLoading(true);const w=await db.from("workouts").insert({user_id:user.id,name:result.name,type:result.type||"Gym"},token);const wId=Array.isArray(w)?w[0]?.id:w?.id;if(wId)await db.from("exercises").insert(result.exercises.map(e=>({workout_id:wId,name:e.name,sets:+e.sets||3,reps:e.reps||"8-12",target_weight:e.target_weight&&!isNaN(+e.target_weight)?+e.target_weight:null})),token);setSaved(true);setLoading(false);setTimeout(()=>{onSaved();onClose();},900);};
+  const Row=({label,opts,val,set})=>(<div style={{marginBottom:12}}><label style={{fontSize:10,color:C.t2,fontWeight:700,letterSpacing:.7,textTransform:"uppercase",display:"block",marginBottom:6}}>{label}</label><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{opts.map(o=><button key={o} onClick={()=>set(o)} style={{padding:"5px 10px",borderRadius:7,background:val===o?C.accentD:C.surface,border:`1.5px solid ${val===o?C.accent:C.border}`,color:val===o?C.accent:C.t2,fontSize:10,fontWeight:700,cursor:"pointer"}}>{o}</button>)}</div></div>);
+  return(<Modal title="✨ AI Workout Generator" onClose={onClose}>{saved?<div style={{textAlign:"center",padding:28}}><div style={{fontSize:44,marginBottom:10}}>✅</div><h3 style={{fontWeight:800}}>Saved! "{result?.name}"</h3></div>:!result?<><Row label="Goal" opts={["Build Muscle","Lose Fat","Strength","Calisthenics"]} val={goal} set={setGoal}/><Row label="Level" opts={["Beginner","Intermediate","Advanced"]} val={level} set={setLevel}/><Row label="Equipment" opts={["Full Gym","Dumbbells Only","Calisthenics","Barbell Only"]} val={equip} set={setEquip}/><Row label="Focus" opts={["Push","Pull","Legs","Full Body","Core","Upper Body"]} val={focus} set={setFocus}/>{err&&<div style={{color:C.red,fontSize:11,background:C.red+"14",padding:"8px 10px",borderRadius:7,marginBottom:10,lineHeight:1.5}}>{err}</div>}<Btn onClick={generate} full loading={loading}>✨ Generate Workout</Btn></>:<><div style={{background:C.accentD,border:`1px solid ${C.accent}28`,borderRadius:9,padding:"9px 12px",marginBottom:12}}><div style={{fontWeight:800,fontSize:14,marginBottom:3}}>{result.name}</div><Tag color={C.blue}>{result.type}</Tag></div><div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:14}}>{result.exercises.map((e,i)=>(<div key={i} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:8,padding:"9px 12px",display:"flex",alignItems:"center",gap:10}}><div style={{width:22,height:22,borderRadius:6,background:C.accentD,display:"flex",alignItems:"center",justifyContent:"center",color:C.accent,fontWeight:800,fontSize:11,flexShrink:0}}>{i+1}</div><div><div style={{fontWeight:700,fontSize:12}}>{e.name}</div><div style={{color:C.t3,fontSize:10}}>{e.sets}×{e.reps}{e.target_weight?` @ ${e.target_weight}kg`:""}</div></div></div>))}</div><div style={{display:"flex",gap:8}}><Btn onClick={()=>setResult(null)} outline full sm>Regenerate</Btn><Btn onClick={save} full loading={loading}>Save ✓</Btn></div></>}</Modal>);
+}
+function ActiveWorkout({db,user,token,workout,onFinish}){
+  const[exercises,setExercises]=useState([]);const[logs,setLogs]=useState({});const[cur,setCur]=useState(0);const[timer,setTimer]=useState(0);const[rest,setRest]=useState(null);const[notes,setNotes]=useState("");const[saving,setSaving]=useState(false);const[showEnd,setShowEnd]=useState(false);const[addingEx,setAddingEx]=useState(false);const[newExName,setNewExName]=useState("");const[intensity,setIntensity]=useState("moderate");
+  const tRef=useRef(null);const rRef=useRef(null);
+  useEffect(()=>{(async()=>{const ex=await db.from("exercises").select("*",token,`&workout_id=eq.${workout.id}&order=id`);const el=Array.isArray(ex)?ex:(workout.exercises||[]);setExercises(el);const il={};el.forEach((e,i)=>{il[i]=Array.from({length:e.sets||3},()=>({reps:e.reps?.split("-")[0]||"8",weight:e.target_weight?String(e.target_weight):"",done:false}));});setLogs(il);})();tRef.current=setInterval(()=>setTimer(t=>t+1),1000);return()=>{clearInterval(tRef.current);clearInterval(rRef.current);};},[]);
+  const fmt=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+  const startRest=()=>{setRest(60);clearInterval(rRef.current);rRef.current=setInterval(()=>setRest(p=>{if(p<=1){clearInterval(rRef.current);return null;}return p-1;}),1000);};
+  const toggle=(ei,si)=>{const was=logs[ei]?.[si]?.done;setLogs(p=>({...p,[ei]:p[ei].map((s,x)=>x===si?{...s,done:!s.done}:s)}));if(!was)startRest();};
+  const upd=(ei,si,f,v)=>setLogs(p=>({...p,[ei]:p[ei].map((s,x)=>x===si?{...s,[f]:v}:s)}));
+  const addSet=ei=>setLogs(p=>({...p,[ei]:[...p[ei],{reps:"8",weight:p[ei][p[ei].length-1]?.weight||"",done:false}]}));
+  const removeSet=(ei,si)=>{if(logs[ei].length<=1)return;setLogs(p=>({...p,[ei]:p[ei].filter((_,x)=>x!==si)}));};
+  const addExercise=()=>{if(!newExName.trim())return;const ni=exercises.length;setExercises(p=>[...p,{id:"new_"+Date.now(),name:newExName.trim(),sets:3,reps:"8-12",target_weight:null}]);setLogs(p=>({...p,[ni]:[{reps:"8",weight:"",done:false},{reps:"8",weight:"",done:false},{reps:"8",weight:"",done:false}]}));setNewExName("");setAddingEx(false);setCur(ni);};
+  const totalVol=Object.values(logs).flat().filter(s=>s.done).reduce((a,s)=>a+((+s.reps||0)*(+s.weight||0)),0);
+  const done=Object.values(logs).flat().filter(s=>s.done).length;const total=Object.values(logs).flat().length;
+  const finish=async()=>{setSaving(true);const lg=await db.from("workout_logs").insert({user_id:user.id,workout_name:workout.name,duration_min:Math.round(timer/60),total_volume:totalVol,intensity,notes},token);const lgId=Array.isArray(lg)?lg[0]?.id:lg?.id;if(lgId){const sets=[];exercises.forEach((ex,ei)=>{(logs[ei]||[]).forEach((s,si)=>{if(s.done)sets.push({log_id:lgId,exercise_name:ex.name,set_number:si+1,reps_done:+s.reps||0,weight_kg:+s.weight||0});});});if(sets.length)await db.from("set_logs").insert(sets,token);}onFinish();};
+  const ex=exercises[cur];const INTENSITIES=[["light","🟢 Light",C.accent],["moderate","🔵 Moderate",C.blue],["heavy","🔴 Heavy",C.orange]];
+  return(<div style={{position:"fixed",inset:0,background:C.bg,zIndex:200,display:"flex",flexDirection:"column"}}>
+    <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:"12px 16px"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}><div><div style={{fontWeight:800,fontSize:16}}>{workout.name}</div><div style={{color:C.t2,fontSize:10}}>{done}/{total} sets · {Math.round(totalVol)}kg</div></div><div style={{fontFamily:"'DM Mono'",fontSize:24,fontWeight:800,color:C.accent}}>{fmt(timer)}</div></div>
+      <div style={{height:3,background:C.border,borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${total?(done/total)*100:0}%`,background:C.accent,borderRadius:2,transition:"width .4s"}}/></div>
+    </div>
+    {rest!==null&&<div className="pi" style={{background:C.blue+"18",borderBottom:`2px solid ${C.blue}`,padding:"8px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{color:C.blue,fontWeight:700,fontSize:11}}>💤 Rest</span><span style={{fontFamily:"'DM Mono'",fontSize:20,color:C.blue,fontWeight:700}}>{fmt(rest)}</span><button onClick={()=>{clearInterval(rRef.current);setRest(null);}} style={{background:C.blue+"28",color:C.blue,border:"none",borderRadius:6,padding:"3px 10px",fontSize:10,fontWeight:700,cursor:"pointer"}}>Skip</button></div>}
+    <div style={{display:"flex",overflowX:"auto",padding:"8px 16px 0",gap:7,borderBottom:`1px solid ${C.border}`}}>
+      {exercises.map((e,i)=>{const d=(logs[i]||[]).filter(s=>s.done).length,t=(logs[i]||[]).length,all=d===t&&t>0;return<button key={i} onClick={()=>setCur(i)} style={{flexShrink:0,padding:"6px 11px",borderRadius:"8px 8px 0 0",background:cur===i?C.card:"transparent",border:`1px solid ${cur===i?C.border:"transparent"}`,borderBottom:cur===i?`1px solid ${C.card}`:"none",color:all?C.accent:cur===i?C.t1:C.t3,fontWeight:700,fontSize:10,cursor:"pointer",whiteSpace:"nowrap",marginBottom:-1}}>{all?"✓ ":""}{e.name}</button>;})}
+      <button onClick={()=>setAddingEx(true)} style={{flexShrink:0,padding:"6px 10px",borderRadius:"8px 8px 0 0",background:"transparent",border:"1px dashed "+C.border,color:C.t3,fontSize:10,fontWeight:700,cursor:"pointer",marginBottom:-1}}>+ Add</button>
+    </div>
+    {addingEx&&<div className="pi" style={{padding:"10px 16px",background:C.surface,borderBottom:`1px solid ${C.border}`,display:"flex",gap:8,alignItems:"center"}}><input value={newExName} onChange={e=>setNewExName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addExercise()} placeholder="Exercise name..." autoFocus style={{flex:1,background:C.card,border:`1px solid ${C.border}`,borderRadius:7,padding:"7px 10px",color:C.t1,fontSize:12,outline:"none",fontFamily:"'Syne'"}}/><Btn onClick={addExercise} sm>Add</Btn><button onClick={()=>setAddingEx(false)} style={{background:"transparent",border:"none",color:C.t3,cursor:"pointer",fontSize:16}}>×</button></div>}
+    <div style={{flex:1,overflowY:"auto",padding:16}}>
+      {ex&&<><div style={{marginBottom:12}}><h2 style={{fontSize:20,fontWeight:800,marginBottom:2}}>{ex.name}</h2><p style={{color:C.t2,fontSize:10}}>Edit each set independently</p></div>
+      <div style={{display:"grid",gridTemplateColumns:"34px 1fr 1fr 40px 26px",gap:6,marginBottom:5}}>{["#","REPS","KG","✓",""].map((h,i)=><div key={i} style={{fontSize:9,color:C.t3,fontWeight:700,textAlign:"center"}}>{h}</div>)}</div>
+      <div style={{display:"flex",flexDirection:"column",gap:7}}>{(logs[cur]||[]).map((s,si)=>(<div key={si} style={{display:"grid",gridTemplateColumns:"34px 1fr 1fr 40px 26px",gap:6,alignItems:"center",background:s.done?C.accentD:C.card,border:`1px solid ${s.done?C.accent+"40":C.border}`,borderRadius:10,padding:"8px",transition:"all .2s"}}><div style={{width:26,height:26,borderRadius:"50%",background:s.done?C.accent:C.surface,display:"flex",alignItems:"center",justifyContent:"center",color:s.done?C.bg:C.t3,fontWeight:800,fontSize:11,margin:"0 auto",transition:"all .2s"}}>{s.done?"✓":si+1}</div><input type="number" value={s.reps} onChange={e=>upd(cur,si,"reps",e.target.value)} style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:7,padding:"8px 4px",color:C.t1,fontSize:16,fontWeight:800,textAlign:"center",outline:"none",fontFamily:"'DM Mono'"}}/><input type="number" value={s.weight} onChange={e=>upd(cur,si,"weight",e.target.value)} placeholder="0" style={{width:"100%",background:C.surface,border:`1px solid ${C.border}`,borderRadius:7,padding:"8px 4px",color:C.t1,fontSize:16,fontWeight:800,textAlign:"center",outline:"none",fontFamily:"'DM Mono'"}}/><button onClick={()=>toggle(cur,si)} style={{width:36,height:36,borderRadius:9,background:s.done?C.accent:C.surface,border:`1.5px solid ${s.done?C.accent:C.border}`,color:s.done?C.bg:C.t2,fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto",transition:"all .2s"}}>{s.done?"✓":"○"}</button><button onClick={()=>removeSet(cur,si)} style={{background:"transparent",border:"none",color:C.t3,cursor:"pointer",fontSize:14,textAlign:"center"}}>−</button></div>))}</div>
+      <button onClick={()=>addSet(cur)} style={{marginTop:9,width:"100%",padding:"8px",background:"transparent",border:`1px dashed ${C.border}`,borderRadius:9,color:C.t2,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"'Syne'"}}>+ Add Set</button>
+      <div style={{display:"flex",gap:8,marginTop:10}}>{cur>0&&<Btn onClick={()=>setCur(p=>p-1)} outline sm>← Prev</Btn>}{cur<exercises.length-1&&<Btn onClick={()=>setCur(p=>p+1)} full sm>Next →</Btn>}</div></>}
+    </div>
+    {!showEnd?<div style={{padding:"12px 16px",background:C.surface,borderTop:`1px solid ${C.border}`}}><Btn onClick={()=>setShowEnd(true)} full>Finish Workout ✓</Btn></div>
+    :<div className="pi" style={{padding:"12px 16px",background:C.card,borderTop:`1px solid ${C.border}`}}>
+      <p style={{fontWeight:800,marginBottom:6,fontSize:12}}>Save this session?</p><p style={{color:C.t2,fontSize:10,marginBottom:9}}>{fmt(timer)} · {done} sets · {Math.round(totalVol)}kg</p>
+      <div style={{marginBottom:10}}><label style={{fontSize:10,color:C.t2,fontWeight:700,letterSpacing:.7,textTransform:"uppercase",display:"block",marginBottom:6}}>Intensity</label><div style={{display:"flex",gap:6}}>{INTENSITIES.map(([id,label,color])=>(<button key={id} onClick={()=>setIntensity(id)} style={{flex:1,padding:"7px 4px",borderRadius:8,background:intensity===id?color+"20":C.surface,border:`1.5px solid ${intensity===id?color:C.border}`,color:intensity===id?color:C.t2,fontSize:10,fontWeight:700,cursor:"pointer"}}>{label}</button>))}</div></div>
+      <Inp label="Notes (optional)" value={notes} onChange={setNotes} placeholder="How was it?"/>
+      <div style={{display:"flex",gap:8,marginTop:10}}><Btn onClick={()=>setShowEnd(false)} outline sm full>Back</Btn><Btn onClick={finish} full loading={saving}>Save & Exit</Btn></div>
+    </div>}
+  </div>);
+}
+function NutritionScreen({db,user,token,aiKey}){
+  const[logs,setLogs]=useState([]);const[loading,setLoading]=useState(true);const[showAdd,setShowAdd]=useState(false);
+  const[food,setFood]=useState("");const[qty,setQty]=useState("");const[cal,setCal]=useState("");const[prot,setProt]=useState("");const[carbs,setCarbs]=useState("");const[fat,setFat]=useState("");
+  const[aiLoading,setAiLoading]=useState(false);const[aiErr,setAiErr]=useState("");const[saving,setSaving]=useState(false);
+  const today=new Date().toLocaleDateString("en-CA");
+  const load=useCallback(async()=>{setLoading(true);const l=await db.from("nutrition_logs").select("*",token,`&user_id=eq.${user.id}&order=logged_at.desc&limit=50`);setLogs(Array.isArray(l)?l:[]);setLoading(false);},[db,token,user.id]);
+  useEffect(()=>{load();},[load]);
+  const aiLookup=async()=>{if(!food.trim()){setAiErr("Enter food name first.");return;}setAiLoading(true);setAiErr("");const prompt=`Nutrition for "${food.trim()}"${qty.trim()?" quantity "+qty.trim():""}. Reply ONLY JSON no markdown: {"calories":250,"protein_g":20,"carbs_g":30,"fat_g":8} Realistic values, 100g default if no qty given.`;try{const raw=await callAI(prompt,aiKey);const d=extractJSON(raw);if(d.calories!==undefined)setCal(String(Math.round(d.calories)));if(d.protein_g!==undefined)setProt(String(Math.round(d.protein_g)));if(d.carbs_g!==undefined)setCarbs(String(Math.round(d.carbs_g)));if(d.fat_g!==undefined)setFat(String(Math.round(d.fat_g)));}catch(e){setAiErr("AI lookup failed: "+e.message);}finally{setAiLoading(false);}};
+  const saveMeal=async()=>{if(!food.trim())return;setSaving(true);await db.from("nutrition_logs").insert({user_id:user.id,meal_name:food.trim(),quantity:qty.trim()||null,calories:+cal||0,protein_g:+prot||0,carbs_g:+carbs||0,fat_g:+fat||0},token);setFood("");setQty("");setCal("");setProt("");setCarbs("");setFat("");setAiErr("");setSaving(false);setShowAdd(false);load();};
+  const todayLogs=logs.filter(l=>{if(!l.logged_at)return false;const d=new Date(l.logged_at);return d.toLocaleDateString("en-CA")===today;});
+  const totals=todayLogs.reduce((a,l)=>({cal:a.cal+(l.calories||0),prot:a.prot+(+l.protein_g||0),carbs:a.carbs+(+l.carbs_g||0),fat:a.fat+(+l.fat_g||0)}),{cal:0,prot:0,carbs:0,fat:0});
+  return(<div className="screen"><div style={{padding:"48px 16px 0"}}>
+    <div className="fu" style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:14}}><div><h1 style={{fontSize:30,fontWeight:800,letterSpacing:1}}>NUTRITION</h1><p style={{color:C.t2,fontSize:11}}>Today's intake</p></div><Btn onClick={()=>setShowAdd(s=>!s)} sm>{showAdd?"✕ Cancel":"+ Log Meal"}</Btn></div>
+    <Card glow sx={{marginBottom:14}} className="fu"><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><span style={{fontWeight:800,fontSize:14}}>Today's Macros</span><span style={{fontFamily:"'DM Mono'",fontSize:20,fontWeight:800,color:C.accent}}>{totals.cal}<span style={{fontSize:11,color:C.t3}}> kcal</span></span></div><MacroBar label="Protein" val={totals.prot} goal={160} color={C.blue}/><MacroBar label="Carbs" val={totals.carbs} goal={250} color={C.orange}/><MacroBar label="Fat" val={totals.fat} goal={70} color={C.purple}/></Card>
+    {showAdd&&<Card className="pi" sx={{marginBottom:14,border:`1px solid ${C.accent}35`}}>
+      <p style={{fontWeight:800,fontSize:13,marginBottom:11}}>Log a Meal</p>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 90px",gap:8,marginBottom:8}}><Inp label="Food Name" value={food} onChange={setFood} placeholder="e.g. Boiled eggs"/><Inp label="Quantity" value={qty} onChange={setQty} placeholder="4 pcs"/></div>
+      <button onClick={aiLookup} disabled={aiLoading||!food.trim()} style={{width:"100%",marginBottom:10,padding:"9px",background:`linear-gradient(135deg,${C.purple}20,${C.blue}20)`,border:`1.5px solid ${C.purple}45`,borderRadius:9,color:C.purple,fontWeight:700,fontSize:12,cursor:food.trim()?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:7,fontFamily:"'Syne'",opacity:food.trim()?1:.5}}>{aiLoading?<><Spin s={13} c={C.purple}/>Looking up...</>:"🤖 AI Auto-Fill Macros"}</button>
+      {aiErr&&<div style={{color:C.red,fontSize:11,background:C.red+"14",padding:"6px 9px",borderRadius:7,marginBottom:9,lineHeight:1.5}}>{aiErr}</div>}
+      <p style={{fontSize:10,color:C.t3,marginBottom:7}}>Or fill manually:</p>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}><Inp label="Calories" type="number" value={cal} onChange={setCal} placeholder="0" small/><Inp label="Protein (g)" type="number" value={prot} onChange={setProt} placeholder="0" small/><Inp label="Carbs (g)" type="number" value={carbs} onChange={setCarbs} placeholder="0" small/><Inp label="Fat (g)" type="number" value={fat} onChange={setFat} placeholder="0" small/></div>
+      <div style={{display:"flex",gap:8}}><Btn onClick={()=>{setShowAdd(false);setFood("");setQty("");setCal("");setProt("");setCarbs("");setFat("");setAiErr("");}} outline full sm>Cancel</Btn><Btn onClick={saveMeal} full loading={saving} sm>Save Meal</Btn></div>
+    </Card>}
+    <h3 style={{fontWeight:700,marginBottom:9,fontSize:13}} className="fu">Today ({todayLogs.length} meals)</h3>
+    {loading?<div style={{display:"flex",justifyContent:"center",padding:18}}><Spin s={24}/></div>:todayLogs.length===0?<Card><p style={{color:C.t3,textAlign:"center",fontSize:12}}>No meals logged today.</p></Card>:<div style={{display:"flex",flexDirection:"column",gap:7}} className="fu">{todayLogs.map(l=>(<Card key={l.id} sx={{display:"flex",alignItems:"center",gap:10}}><div style={{width:34,height:34,borderRadius:8,background:C.orange+"18",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,flexShrink:0}}>🍽️</div><div style={{flex:1}}><div style={{fontWeight:700,fontSize:12,marginBottom:1}}>{l.meal_name}{l.quantity&&<span style={{color:C.t3,fontWeight:400,fontSize:11}}> · {l.quantity}</span>}</div><div style={{display:"flex",gap:8,fontSize:10,color:C.t3}}><span style={{color:C.accent,fontFamily:"'DM Mono'"}}>{l.calories}kcal</span><span>P:{Math.round(l.protein_g)}g</span><span>C:{Math.round(l.carbs_g)}g</span><span>F:{Math.round(l.fat_g)}g</span></div></div><span style={{fontSize:10,color:C.t3}}>{new Date(l.logged_at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></Card>))}</div>}
+  </div></div>);
+}
+function ReportsScreen({db,user,token}){
+  const[period,setPeriod]=useState("week");const[wLogs,setWLogs]=useState([]);const[nLogs,setNLogs]=useState([]);const[sLogs,setSLogs]=useState([]);const[bwLogs,setBwLogs]=useState([]);const[waterLogs,setWaterLogs]=useState([]);const[loading,setLoading]=useState(true);
+  const[bw,setBw]=useState("");const[savingBw,setSavingBw]=useState(false);const[showExportMenu,setShowExportMenu]=useState(false);const[showShareMenu,setShowShareMenu]=useState(false);
+  useEffect(()=>{setLoading(true);const limit=period==="day"?1:period==="week"?7:period==="month"?30:365;const since=new Date();since.setDate(since.getDate()-limit);const s=since.toISOString();Promise.all([db.from("workout_logs").select("*",token,`&user_id=eq.${user.id}&completed_at=gte.${s}&order=completed_at.desc`),db.from("nutrition_logs").select("*",token,`&user_id=eq.${user.id}&logged_at=gte.${s}&order=logged_at.desc`),db.from("set_logs").select("*",token,`&log_id=in.(select id from workout_logs where user_id='${user.id}' and completed_at>='${s}')&order=logged_at.desc`),db.from("body_weight_logs").select("*",token,`&user_id=eq.${user.id}&order=logged_at.desc&limit=30`),db.from("water_logs").select("*",token,`&user_id=eq.${user.id}&logged_at=gte.${s}&order=logged_at.desc`)]).then(([w,n,sl,bw,wa])=>{setWLogs(Array.isArray(w)?w:[]);setNLogs(Array.isArray(n)?n:[]);setSLogs(Array.isArray(sl)?sl:[]);setBwLogs(Array.isArray(bw)?bw:[]);setWaterLogs(Array.isArray(wa)?wa:[]);setLoading(false);});},[period]);
+  const logBw=async()=>{if(!bw)return;setSavingBw(true);await db.from("body_weight_logs").insert({user_id:user.id,weight_kg:+bw},token);const w=await db.from("body_weight_logs").select("*",token,`&user_id=eq.${user.id}&order=logged_at.desc&limit=30`);setBwLogs(Array.isArray(w)?w:[]);setSavingBw(false);setBw("");};
+  const uniqueDays=arr=>[...new Set(arr.map(l=>(l.logged_at||l.completed_at)?.split("T")[0]))].length||1;
+  const totalVol=Math.round(wLogs.reduce((a,l)=>a+(l.total_volume||0),0));const totalMin=wLogs.reduce((a,l)=>a+(l.duration_min||0),0);const totalCal=nLogs.reduce((a,l)=>a+(l.calories||0),0);const avgCal=nLogs.length?Math.round(totalCal/uniqueDays(nLogs)):0;
+  const avgProt=Math.round(nLogs.reduce((a,l)=>a+(+l.protein_g||0),0)/Math.max(uniqueDays(nLogs),1));const avgCarbs=Math.round(nLogs.reduce((a,l)=>a+(+l.carbs_g||0),0)/Math.max(uniqueDays(nLogs),1));const avgFat=Math.round(nLogs.reduce((a,l)=>a+(+l.fat_g||0),0)/Math.max(uniqueDays(nLogs),1));const avgWater=waterLogs.length?Math.round(waterLogs.reduce((a,w)=>a+(w.amount_ml||0),0)/Math.max(uniqueDays(waterLogs),1)):0;
+  const prs={};sLogs.forEach(s=>{const k=s.exercise_name;if(!prs[k]||s.weight_kg>prs[k].w)prs[k]={w:s.weight_kg,r:s.reps_done};});const prList=Object.entries(prs).sort((a,b)=>b[1].w-a[1].w).slice(0,8);
+  const days=period==="day"?1:period==="week"?7:period==="month"?30:365;
+  const buildChart=(logs,dateField,valFn)=>{const m={};for(let i=days-1;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);m[d.toISOString().split("T")[0]]=0;}logs.forEach(l=>{const d=(l[dateField]||"").split("T")[0];if(m.hasOwnProperty(d))m[d]+=valFn(l);});return Object.entries(m);};
+  const volChart=buildChart(wLogs,"completed_at",l=>l.total_volume||0);const calChart=buildChart(nLogs,"logged_at",l=>l.calories||0);const waterChart=buildChart(waterLogs,"logged_at",l=>l.amount_ml||0);
+  const maxV=Math.max(...volChart.map(([,v])=>v),1);const maxC=Math.max(...calChart.map(([,v])=>v),1);const maxW=Math.max(...waterChart.map(([,v])=>v),1);
+  const foodCount={};nLogs.forEach(l=>{foodCount[l.meal_name]=(foodCount[l.meal_name]||0)+1;});const topFoods=Object.entries(foodCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const bwChart=bwLogs.slice(0,10).reverse();const bwMax=Math.max(...bwChart.map(b=>+b.weight_kg),1);const bwMin=Math.min(...bwChart.map(b=>+b.weight_kg),bwMax);
+  const MiniBar=({entries,maxVal,color,h=50})=>(<div style={{display:"flex",alignItems:"flex-end",gap:days>30?2:4,height:h}}>{entries.map(([d,v],i)=>(<div key={i} style={{flex:1,height:"100%",display:"flex",alignItems:"flex-end"}}><div style={{width:"100%",height:`${(v/maxVal)*100}%`,minHeight:v>0?2:0,background:v>0?`linear-gradient(to top,${color},${color}70)`:C.border,borderRadius:"2px 2px 0 0",transition:"height .4s ease"}}/></div>))}</div>);
+  const doCSV=()=>{downloadCSV(wLogs.map(l=>({date:l.completed_at?.split("T")[0],workout:l.workout_name,duration_min:l.duration_min,volume_kg:l.total_volume,intensity:l.intensity})),"apex_workouts.csv");if(nLogs.length)downloadCSV(nLogs.map(l=>({date:l.logged_at?.split("T")[0],meal:l.meal_name,qty:l.quantity,calories:l.calories,protein_g:l.protein_g,carbs_g:l.carbs_g,fat_g:l.fat_g})),"apex_nutrition.csv");setShowExportMenu(false);};
+  const doXLSX=()=>{downloadXLSX([{name:"Workouts",data:wLogs.map(l=>({Date:l.completed_at?.split("T")[0],Workout:l.workout_name,"Duration (min)":l.duration_min,"Volume (kg)":l.total_volume,Intensity:l.intensity}))},{name:"Nutrition",data:nLogs.map(l=>({Date:l.logged_at?.split("T")[0],Meal:l.meal_name,Quantity:l.quantity,Calories:l.calories,"Protein (g)":l.protein_g,"Carbs (g)":l.carbs_g,"Fat (g)":l.fat_g}))},{name:"Body Weight",data:bwLogs.map(l=>({Date:l.logged_at?.split("T")[0],"Weight (kg)":l.weight_kg}))}],"apex_report.xlsx");setShowExportMenu(false);};
+  const doPDF=()=>{downloadPDF(`Fitness Report — ${period.toUpperCase()}`,[{heading:"Workout Sessions",cols:["Date","Workout","Duration","Volume","Intensity"],rows:wLogs.map(l=>[l.completed_at?.split("T")[0],l.workout_name||"",l.duration_min+"min",Math.round(l.total_volume||0)+"kg",l.intensity||"moderate"])},{heading:"Nutrition Log",cols:["Date","Meal","Qty","Calories","Protein","Carbs","Fat"],rows:nLogs.map(l=>[l.logged_at?.split("T")[0],l.meal_name,l.quantity||"",l.calories+"kcal",Math.round(l.protein_g||0)+"g",Math.round(l.carbs_g||0)+"g",Math.round(l.fat_g||0)+"g"])},{heading:"Body Weight",cols:["Date","Weight (kg)"],rows:bwLogs.map(l=>[l.logged_at?.split("T")[0],l.weight_kg])},{heading:"Strength PRs",cols:["Exercise","Best Weight","Reps"],rows:prList.map(([name,pr])=>[name,pr.w+"kg",pr.r+" reps"])}]);setShowExportMenu(false);};
+  const reportStats={sessions:wLogs.length,volume:totalVol,minutes:totalMin,avgCal};
+  const PERIODS=[["day","Today"],["week","Week"],["month","Month"],["year","Year"]];
+  return(<div className="screen" onClick={()=>{setShowExportMenu(false);setShowShareMenu(false);}}><div style={{padding:"48px 16px 0"}}>
+    <div className="fu" style={{marginBottom:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <h1 style={{fontSize:30,fontWeight:800,letterSpacing:1}}>REPORTS</h1>
+        <div style={{display:"flex",gap:7}}>
+          <div style={{position:"relative"}}><Btn onClick={e=>{e.stopPropagation();setShowShareMenu(m=>!m);setShowExportMenu(false);}} sm color={C.purple} outline>↗ Share</Btn>{showShareMenu&&<div className="pi" style={{position:"absolute",top:"100%",right:0,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:10,zIndex:200,marginTop:4,minWidth:200}} onClick={e=>e.stopPropagation()}><p style={{fontSize:10,color:C.t2,fontWeight:700,marginBottom:8,textTransform:"uppercase",letterSpacing:.5}}>Share Report</p><div style={{display:"flex",flexDirection:"column",gap:5}}>{[{id:"whatsapp",label:"WhatsApp",icon:"💬",color:"#25D366"},{id:"twitter",label:"Twitter/X",icon:"🐦",color:"#1DA1F2"},{id:"facebook",label:"Facebook",icon:"📘",color:"#1877F2"},{id:"instagram",label:"Instagram",icon:"📸",color:"#E1306C"},{id:"telegram",label:"Telegram",icon:"✈️",color:"#0088cc"}].map(p=>(<button key={p.id} onClick={()=>{shareReport(p.id,reportStats);setShowShareMenu(false);}} style={{display:"flex",alignItems:"center",gap:10,background:p.color+"14",border:`1px solid ${p.color}25`,borderRadius:8,padding:"8px 12px",cursor:"pointer",color:p.color,fontWeight:700,fontSize:11,textAlign:"left"}}><span style={{fontSize:15}}>{p.icon}</span>{p.label}</button>))}</div></div>}</div>
+          <div style={{position:"relative"}}><Btn onClick={e=>{e.stopPropagation();setShowExportMenu(m=>!m);setShowShareMenu(false);}} sm color={C.blue} outline>⬇ Export</Btn>{showExportMenu&&<div className="pi" style={{position:"absolute",top:"100%",right:0,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:8,zIndex:200,marginTop:4,minWidth:170}} onClick={e=>e.stopPropagation()}>{[["📄 Export CSV",doCSV,C.t1],["📊 Export Excel",doXLSX,C.accent],["📑 Export PDF",doPDF,C.red]].map(([label,fn,color])=>(<button key={label} onClick={fn} style={{display:"block",width:"100%",background:"transparent",border:"none",color,padding:"9px 12px",textAlign:"left",cursor:"pointer",fontSize:12,borderRadius:7,fontFamily:"'Syne'",fontWeight:600}}>{label}</button>))}</div>}</div>
+        </div>
+      </div>
+      <div style={{display:"flex",background:C.surface,borderRadius:9,padding:3,border:`1px solid ${C.border}`,gap:3}}>{PERIODS.map(([id,label])=>(<button key={id} onClick={()=>setPeriod(id)} style={{flex:1,padding:"7px 4px",borderRadius:7,background:period===id?C.accent:"transparent",color:period===id?C.bg:C.t2,fontWeight:700,fontSize:11,border:"none",cursor:"pointer",transition:"all .2s"}}>{label}</button>))}</div>
+    </div>
+    {loading?<div style={{display:"flex",justifyContent:"center",padding:36}}><Spin s={28}/></div>:<>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}} className="fu">{[[wLogs.length+" sessions","Workouts","💪",C.accent],[totalVol+"kg","Volume","🏋️",C.blue],[totalMin+"min","Active","⏱",C.purple],[avgCal+"kcal/day","Avg Cal","🔥",C.orange]].map(([v,l,i,c])=>(<Card key={l} sx={{display:"flex",alignItems:"center",gap:10}}><div style={{fontSize:20}}>{i}</div><div><div style={{fontFamily:"'DM Mono'",fontSize:16,fontWeight:800,color:c}}>{v}</div><div style={{fontSize:9,color:C.t3,fontWeight:700,textTransform:"uppercase",letterSpacing:.4}}>{l}</div></div></Card>))}</div>
+    <Card sx={{marginBottom:10}} className="fu"><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:9}}><p style={{fontWeight:800,fontSize:13}}>Training Volume</p><span style={{fontFamily:"'DM Mono'",fontSize:11,color:C.accent}}>{totalVol}kg</span></div><MiniBar entries={volChart} maxVal={maxV} color={C.accent}/></Card>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}} className="fu"><Card><p style={{fontWeight:700,fontSize:11,marginBottom:8}}>Calories <span style={{color:C.t3,fontWeight:400}}>{avgCal}/day</span></p><MiniBar entries={calChart} maxVal={maxC} color={C.orange} h={40}/></Card><Card><p style={{fontWeight:700,fontSize:11,marginBottom:8}}>Water <span style={{color:C.t3,fontWeight:400,fontSize:10}}>{(avgWater/1000).toFixed(1)}L/day</span></p><MiniBar entries={waterChart} maxVal={maxW} color={C.blue} h={40}/></Card></div>
+    <Card sx={{marginBottom:10}} className="fu"><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}><p style={{fontWeight:800,fontSize:13}}>Body Weight</p><div style={{display:"flex",gap:7,alignItems:"center"}}><input type="number" value={bw} onChange={e=>setBw(e.target.value)} placeholder="kg" style={{width:60,background:C.surface,border:`1px solid ${C.border}`,borderRadius:7,padding:"5px 8px",color:C.t1,fontSize:11,outline:"none",fontFamily:"'DM Mono'",textAlign:"center"}}/><Btn onClick={logBw} sm loading={savingBw} disabled={!bw}>Log</Btn></div></div>{bwChart.length<2?<p style={{color:C.t3,fontSize:11,textAlign:"center"}}>Log 2+ weigh-ins to see trend</p>:(<><svg width="100%" height="55" style={{overflow:"visible"}}><polyline fill="none" stroke={C.blue} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={bwChart.map((b,i)=>{const y=bwMax===bwMin?27:((bwMax-(+b.weight_kg))/(bwMax-bwMin))*45+5;return`${(i/(bwChart.length-1))*100}%,${y}`;}).join(" ")}/>{bwChart.map((b,i)=>{const y=bwMax===bwMin?27:((bwMax-(+b.weight_kg))/(bwMax-bwMin))*45+5;return<circle key={i} cx={`${(i/(bwChart.length-1))*100}%`} cy={y} r="3.5" fill={C.blue}/>;})}</svg><div style={{display:"flex",gap:12,justifyContent:"center",marginTop:8}}>{[["Start",bwChart[0]?.weight_kg+"kg",C.t2],["Latest",bwChart[bwChart.length-1]?.weight_kg+"kg",C.blue],["Δ",((bwChart[bwChart.length-1]?.weight_kg-bwChart[0]?.weight_kg)>0?"+":"")+((bwChart[bwChart.length-1]?.weight_kg-bwChart[0]?.weight_kg)||0).toFixed(1)+"kg",bwChart[bwChart.length-1]?.weight_kg<bwChart[0]?.weight_kg?C.accent:C.orange]].map(([l,v,c])=>(<div key={l} style={{textAlign:"center"}}><div style={{fontSize:9,color:C.t3,marginBottom:1,textTransform:"uppercase"}}>{l}</div><div style={{fontFamily:"'DM Mono'",fontSize:14,fontWeight:800,color:c}}>{v}</div></div>))}</div></>)}</Card>
+    <Card sx={{marginBottom:10}} className="fu"><p style={{fontWeight:800,fontSize:13,marginBottom:10}}>Strength PRs 🏆</p>{prList.length===0?<p style={{color:C.t3,fontSize:11,textAlign:"center"}}>Complete workouts to see PRs</p>:<div style={{display:"flex",flexDirection:"column",gap:6}}>{prList.map(([name,pr],i)=>(<div key={name} style={{display:"flex",alignItems:"center",gap:10,background:C.surface,borderRadius:8,padding:"8px 11px"}}><span style={{fontSize:14,flexShrink:0}}>{i===0?"🥇":i===1?"🥈":i===2?"🥉":"💪"}</span><div style={{flex:1}}><div style={{fontWeight:700,fontSize:12}}>{name}</div><div style={{color:C.t3,fontSize:10}}>{pr.r} reps</div></div><div style={{textAlign:"right"}}><div style={{fontFamily:"'DM Mono'",fontWeight:800,fontSize:14,color:C.accent}}>{pr.w}kg</div></div></div>))}</div>}</Card>
+    {topFoods.length>0&&<Card sx={{marginBottom:10}} className="fu"><p style={{fontWeight:800,fontSize:13,marginBottom:10}}>Most Eaten 🍽️</p><div style={{display:"flex",flexDirection:"column",gap:6}}>{topFoods.map(([food,count],i)=>(<div key={food} style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:C.surface,borderRadius:8,padding:"7px 11px"}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:20,height:20,borderRadius:5,background:C.orange+"25",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800,color:C.orange}}>{i+1}</div><span style={{fontSize:12,fontWeight:600}}>{food}</span></div><Tag color={C.orange}>{count}×</Tag></div>))}</div></Card>}
+    {nLogs.length>0&&<Card sx={{marginBottom:10}} className="fu"><p style={{fontWeight:800,fontSize:13,marginBottom:10}}>Avg Daily Macros</p><MacroBar label="Protein" val={avgProt} goal={160} color={C.blue}/><MacroBar label="Carbs" val={avgCarbs} goal={250} color={C.orange}/><MacroBar label="Fat" val={avgFat} goal={70} color={C.purple}/></Card>}
+    </>}
+  </div></div>);
+}
+function AICoachScreen({user,profile,wLogs,aiKey}){
+  const[msgs,setMsgs]=useState([{role:"assistant",content:"Hey! I'm your AI fitness coach powered by Groq (Llama 3) ⚡\n\nI know your profile and recent training. Ask me anything — workout plans, nutrition, recovery, form tips, or mindset!"}]);
+  const[input,setInput]=useState("");const[thinking,setThinking]=useState(false);const bottomRef=useRef(null);
+  useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:"smooth"});},[msgs]);
+  const send=async()=>{if(!input.trim()||thinking)return;const userMsg={role:"user",content:input.trim()};setMsgs(p=>[...p,userMsg]);setInput("");setThinking(true);const history=[...msgs,userMsg].map(m=>`${m.role==="user"?"User":"Coach"}: ${m.content}`).join("\n");const system=`You are an expert AI fitness coach in the APEX AI app. Be direct, specific, and motivating. Max 150 words unless asked more. Bullet points for lists.\nAthlete: ${profile?.name||"Athlete"} | Goal: ${profile?.goal||"Build Muscle"} | Weight: ${profile?.weight_kg||"?"}kg | Height: ${profile?.height_cm||"?"}cm\nRecent: ${wLogs.slice(0,3).map(l=>`${l.workout_name}(${l.duration_min}min,${Math.round(l.total_volume||0)}kg,${l.intensity||"moderate"})`).join(", ")||"none"}`;try{const reply=await callAI(system+"\n\n---\n"+history+"\nCoach:",aiKey);setMsgs(p=>[...p,{role:"assistant",content:reply.trim()}]);}catch(e){setMsgs(p=>[...p,{role:"assistant",content:"❌ "+e.message}]);}finally{setThinking(false);}};
+  const PROMPTS=["Best post-workout meal?","Build me a 5-day split","How to break plateau?","Am I overtraining?","Tips for fat loss?","Best exercises for back?"];
+  return(<div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",paddingBottom:72}}>
+    <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:"46px 16px 12px",flexShrink:0}}><div style={{display:"flex",alignItems:"center",gap:11}}><div style={{width:42,height:42,borderRadius:12,background:`linear-gradient(135deg,${C.purple},${C.blue})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:19}}>🤖</div><div><div style={{fontWeight:800,fontSize:16}}>AI Coach</div><div style={{fontSize:10,display:"flex",alignItems:"center",gap:5,color:C.accent}}><div style={{width:6,height:6,borderRadius:"50%",background:C.accent}}/>{"Groq Llama 3.3 · Free"}</div></div></div></div>
+    <div style={{flex:1,overflowY:"auto",padding:"12px 16px",display:"flex",flexDirection:"column",gap:10}}>{msgs.map((m,i)=>(<div key={i} style={{display:"flex",justifyContent:m.role==="user"?"flex-end":"flex-start"}} className="fu">{m.role==="assistant"&&<div style={{width:26,height:26,borderRadius:7,background:`linear-gradient(135deg,${C.purple},${C.blue})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,flexShrink:0,marginRight:7,alignSelf:"flex-end"}}>🤖</div>}<div style={{maxWidth:"80%",background:m.role==="user"?C.accent:C.card,color:m.role==="user"?C.bg:C.t1,borderRadius:m.role==="user"?"14px 14px 3px 14px":"14px 14px 14px 3px",padding:"10px 13px",fontSize:12,lineHeight:1.6,border:m.role==="assistant"?`1px solid ${C.border}`:"none",whiteSpace:"pre-wrap"}}>{m.content}</div></div>))}
+    {thinking&&<div style={{display:"flex",alignItems:"flex-end",gap:7}} className="fu"><div style={{width:26,height:26,borderRadius:7,background:`linear-gradient(135deg,${C.purple},${C.blue})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12}}>🤖</div><div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"14px 14px 14px 3px",padding:"11px 14px",display:"flex",gap:4,alignItems:"center"}}>{[0,1,2].map(i=><div key={i} style={{width:5,height:5,background:C.t2,borderRadius:"50%",animation:`blink .9s ${i*0.2}s infinite`}}/>)}</div></div>}
+    <div ref={bottomRef}/></div>
+    {msgs.length<=1&&<div style={{padding:"0 16px 8px",display:"flex",gap:6,overflowX:"auto",flexShrink:0}}>{PROMPTS.map(p=><button key={p} onClick={()=>setInput(p)} style={{flexShrink:0,background:C.surface,border:`1px solid ${C.border}`,borderRadius:18,padding:"6px 11px",fontSize:10,color:C.t2,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",fontFamily:"'Syne'"}}>{p}</button>)}</div>}
+    <div style={{padding:"9px 16px 12px",background:C.surface,borderTop:`1px solid ${C.border}`,flexShrink:0,display:"flex",gap:8}}><input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&send()} placeholder="Ask your AI coach..." style={{flex:1,background:C.card,border:`1.5px solid ${C.border}`,borderRadius:11,padding:"10px 13px",color:C.t1,fontSize:12,outline:"none",fontFamily:"'Syne'"}}/><button onClick={send} disabled={!input.trim()||thinking} style={{width:42,height:42,borderRadius:11,background:input.trim()&&!thinking?C.accent:C.border,border:"none",color:C.bg,fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s",flexShrink:0}}>{thinking?<Spin s={15} c={C.t3}/>:"↑"}</button></div>
+  </div>);
+}
+
+function ProfileModal({db,user,token,profile,onClose,onSignOut}){
+  const[name,setName]=useState(profile?.name||"");const[weight,setWeight]=useState(profile?.weight_kg||"");const[height,setHeight]=useState(profile?.height_cm||"");const[goal,setGoal]=useState(profile?.goal||"Build Muscle");const[calGoal,setCalGoal]=useState(profile?.calorie_goal||2000);const[waterGoal,setWaterGoal]=useState(profile?.water_goal_ml||2500);const[loading,setLoading]=useState(false);const[saved,setSaved]=useState(false);
+  const GOALS=["Build Muscle","Lose Fat","Calisthenics Skills","Strength & Power","General Fitness"];
+  const save=async()=>{setLoading(true);await db.from("profiles").update({name,weight_kg:weight?+weight:null,height_cm:height?+height:null,goal,calorie_goal:+calGoal||2000,water_goal_ml:+waterGoal||2500},token,`id=eq.${user.id}`);setLoading(false);setSaved(true);setTimeout(()=>setSaved(false),2000);};
+  const bmi=weight&&height?(weight/((height/100)**2)).toFixed(1):null;
+  return(<Modal title="Profile" onClose={onClose}><div style={{textAlign:"center",marginBottom:16}}><div style={{width:64,height:64,borderRadius:"50%",background:`linear-gradient(135deg,${C.accent},${C.blue})`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:24,color:C.bg,margin:"0 auto 8px"}}>{(name||user?.email||"A").substring(0,2).toUpperCase()}</div><div style={{fontWeight:800,fontSize:15}}>{name||"Athlete"}</div><div style={{color:C.t2,fontSize:11,marginBottom:6}}>{user?.email}</div>{bmi&&<div style={{display:"flex",justifyContent:"center",gap:14}}>{[["⚖️",weight+"kg"],["📏",height+"cm"],["BMI",bmi]].map(([i,v])=><div key={v} style={{textAlign:"center"}}><div style={{fontSize:14,marginBottom:1}}>{i}</div><div style={{fontFamily:"'DM Mono'",fontSize:12,fontWeight:700}}>{v}</div></div>)}</div>}{saved&&<div className="pi" style={{marginTop:7,background:C.accentD,border:`1px solid ${C.accent}30`,borderRadius:7,padding:"4px 12px",color:C.accent,fontSize:11,fontWeight:700,display:"inline-block"}}>✓ Saved!</div>}</div>
+  <div style={{display:"flex",flexDirection:"column",gap:10}}><Inp label="Name" value={name} onChange={setName} placeholder="Your name"/><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><Inp label="Weight (kg)" type="number" value={String(weight)} onChange={setWeight} placeholder="80"/><Inp label="Height (cm)" type="number" value={String(height)} onChange={setHeight} placeholder="180"/></div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}><Inp label="Calorie Goal" type="number" value={String(calGoal)} onChange={setCalGoal} placeholder="2000"/><Inp label="Water Goal (ml)" type="number" value={String(waterGoal)} onChange={setWaterGoal} placeholder="2500"/></div><div><label style={{fontSize:11,color:C.t2,fontWeight:700,letterSpacing:.7,textTransform:"uppercase",display:"block",marginBottom:6}}>Goal</label><div style={{display:"flex",flexDirection:"column",gap:6}}>{GOALS.map(g=><button key={g} onClick={()=>setGoal(g)} style={{padding:"8px 12px",borderRadius:8,background:goal===g?C.accentD:C.surface,border:`1.5px solid ${goal===g?C.accent:C.border}`,color:goal===g?C.accent:C.t2,fontWeight:700,fontSize:11,cursor:"pointer",textAlign:"left"}}>{goal===g?"✓ ":""}{g}</button>)}</div></div><Btn onClick={save} full loading={loading}>Save Changes</Btn><Btn onClick={onSignOut} outline full color={C.red}>Sign Out</Btn></div></Modal>);
+}
+const SS_KEY="apex_session_v4";const CFG_KEY="apexcfg_v4";
+const saveSession=(cfg,auth)=>{try{localStorage.setItem(CFG_KEY,JSON.stringify(cfg));localStorage.setItem(SS_KEY,JSON.stringify({user:auth.user,token:auth.token,refreshToken:auth.refreshToken||null,name:auth.name,goal:auth.goal,profile:auth.profile,savedAt:Date.now()}));}catch(e){}};
+const loadSession=()=>{try{const cfg=JSON.parse(localStorage.getItem(CFG_KEY)||"null");const ss=JSON.parse(localStorage.getItem(SS_KEY)||"null");return{cfg,ss};}catch{return{cfg:null,ss:null};}};
+const clearSession=()=>{try{localStorage.removeItem(CFG_KEY);localStorage.removeItem(SS_KEY);}catch(e){}};
+const TOKEN_TTL=50*60*1000;
+
+function App(){
+  const init=loadSession();
+  const[config,setConfig]=useState(init.cfg);const[db,setDb]=useState(()=>init.cfg?makeDB(init.cfg.url,init.cfg.key):null);const[auth,setAuth]=useState(null);const[restoring,setRestoring]=useState(!!init.ss);const[screen,setScreen]=useState("home");const[activeWorkout,setActiveWorkout]=useState(null);const[showProfile,setShowProfile]=useState(false);const[recentLogs,setRecentLogs]=useState([]);
+  useEffect(()=>{
+    const{cfg,ss}=init;if(!cfg||!ss){setRestoring(false);return;}
+    const dbInst=makeDB(cfg.url,cfg.key);const age=Date.now()-(ss.savedAt||0);
+    if(age<TOKEN_TTL){setDb(dbInst);setAuth({user:ss.user,token:ss.token,name:ss.name,goal:ss.goal,profile:ss.profile||{}});setRestoring(false);dbInst.from("profiles").select("*",ss.token,`&id=eq.${ss.user.id}`).then(p=>{if(Array.isArray(p)&&p.length)setAuth(a=>({...a,profile:p[0]||a.profile}));}).catch(()=>{});}
+    else{const refreshToken=ss.refreshToken;if(refreshToken){fetch(`${cfg.url}/auth/v1/token?grant_type=refresh_token`,{method:"POST",headers:{apikey:cfg.key,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:refreshToken})}).then(r=>r.json()).then(async r=>{if(r.access_token&&r.user){const newTok=r.access_token;const p=await dbInst.from("profiles").select("*",newTok,`&id=eq.${r.user.id}`);const profile=Array.isArray(p)?p[0]||{}:{};const newAuth={user:r.user,token:newTok,refreshToken:r.refresh_token||refreshToken,name:profile.name||ss.name,goal:profile.goal||ss.goal,profile};saveSession(cfg,newAuth);setDb(dbInst);setAuth(newAuth);}else{clearSession();setConfig(null);setDb(null);}setRestoring(false);}).catch(()=>{clearSession();setConfig(null);setDb(null);setRestoring(false);});}else{setDb(dbInst);setAuth({user:ss.user,token:ss.token,name:ss.name,goal:ss.goal,profile:ss.profile||{}});setRestoring(false);}}
+  },[]);
+  const connect=(url,key,aiKey)=>{const cfg={url,key,aiKey};setDb(makeDB(url,key));setConfig(cfg);localStorage.setItem(CFG_KEY,JSON.stringify(cfg));};
+  const handleAuth=(user,token,name,goal,profile,refreshToken)=>{const newAuth={user,token,refreshToken:refreshToken||null,name,goal,profile:profile||{}};setAuth(newAuth);saveSession({url:config?.url||"",key:config?.key||""},newAuth);};
+  const handleSignOut=async()=>{if(db&&auth)try{await db.auth.signOut(auth.token);}catch(e){}setAuth(null);clearSession();setConfig(null);setDb(null);};
+  const loadLogs=useCallback(async()=>{if(!db||!auth)return;try{const l=await db.from("workout_logs").select("*",auth.token,`&user_id=eq.${auth.user.id}&order=completed_at.desc&limit=5`);setRecentLogs(Array.isArray(l)?l:[]);}catch(e){}},[db,auth]);
+  useEffect(()=>{loadLogs();},[loadLogs]);
+  const finishWorkout=()=>{setActiveWorkout(null);setScreen("reports");loadLogs();};
+  if(restoring)return(<div style={{height:"100vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",background:C.bg,gap:16}}><div style={{width:52,height:52,background:C.accent,borderRadius:15,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>⚡</div><Spin s={22}/><p style={{color:C.t2,fontSize:12}}>Restoring your session...</p></div>);
+  return(<div style={{height:"100vh",position:"relative",maxWidth:480,margin:"0 auto",overflow:"hidden",background:C.bg}}>
+    {!config&&<SetupScreen onConnect={connect}/>}
+    {config&&!auth&&<AuthScreen db={db} onAuth={handleAuth}/>}
+    {config&&auth&&<>
+      <button onClick={()=>setShowProfile(true)} style={{position:"fixed",top:12,right:16,zIndex:150,width:34,height:34,borderRadius:"50%",background:`linear-gradient(135deg,${C.accent},${C.blue})`,border:`2px solid ${C.bg}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:12,color:C.bg}}>{(auth.profile?.name||auth.name||"A").substring(0,2).toUpperCase()}</button>
+      {screen==="home"&&<HomeScreen db={db} user={auth.user} token={auth.token} profile={auth.profile} onNav={setScreen} onStartWorkout={setActiveWorkout} aiKey={config?.aiKey}/>}
+      {screen==="workout"&&<WorkoutScreen db={db} user={auth.user} token={auth.token} onStartWorkout={setActiveWorkout} aiKey={config?.aiKey}/>}
+      {screen==="nutrition"&&<NutritionScreen db={db} user={auth.user} token={auth.token} aiKey={config?.aiKey}/>}
+      {screen==="photos"&&<PhotosScreen db={db} user={auth.user} token={auth.token}/>}
+      {screen==="reports"&&<ReportsScreen db={db} user={auth.user} token={auth.token}/>}
+      {screen==="ai"&&<AICoachScreen user={auth.user} profile={auth.profile} wLogs={recentLogs} aiKey={config?.aiKey}/>}
+      <BottomNav active={screen} onNav={setScreen}/>
+      {activeWorkout&&<ActiveWorkout db={db} user={auth.user} token={auth.token} workout={activeWorkout} onFinish={finishWorkout}/>}
+      {showProfile&&<ProfileModal db={db} user={auth.user} token={auth.token} profile={auth.profile} onClose={()=>setShowProfile(false)} onSignOut={handleSignOut}/>}
+    </>}
+  </div>);
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
