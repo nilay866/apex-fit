@@ -122,7 +122,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
             child: Column(
               children: [
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Text("Today's macros", style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w800, fontSize: 18, color: ApexColors.t1)),
+                  Text("Today's macros", style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18, color: ApexColors.t1)),
                   RichText(text: TextSpan(children: [
                     TextSpan(text: '$totCal', style: ApexTheme.mono(size: 20, color: ApexColors.accent)),
                     TextSpan(text: ' kcal', style: ApexTheme.mono(size: 11, color: ApexColors.t3)),
@@ -141,7 +141,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Log a Meal', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w800, fontSize: 13, color: ApexColors.t1)),
+                  Text('Log a Meal', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13, color: ApexColors.t1)),
                   const SizedBox(height: 11),
                   Row(children: [
                     Expanded(child: _field('Food Name', _foodC, 'e.g. Boiled eggs')),
@@ -162,8 +162,8 @@ class _NutritionScreenState extends State<NutritionScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: _aiLoading
-                            ? [SizedBox(width: 13, height: 13, child: CircularProgressIndicator(strokeWidth: 2, color: ApexColors.purple)), const SizedBox(width: 7), Text('Looking up...', style: GoogleFonts.spaceGrotesk(color: ApexColors.purple, fontWeight: FontWeight.w700, fontSize: 12))]
-                            : [const Icon(Icons.auto_awesome_rounded, size: 16, color: ApexColors.purple), const SizedBox(width: 7), Text('Auto-fill macros', style: GoogleFonts.spaceGrotesk(color: ApexColors.purple, fontWeight: FontWeight.w700, fontSize: 12))],
+                            ? [SizedBox(width: 13, height: 13, child: CircularProgressIndicator(strokeWidth: 2, color: ApexColors.purple)), const SizedBox(width: 7), Text('Looking up...', style: GoogleFonts.inter(color: ApexColors.purple, fontWeight: FontWeight.w700, fontSize: 12))]
+                            : [const Icon(Icons.auto_awesome_rounded, size: 16, color: ApexColors.purple), const SizedBox(width: 7), Text('Auto-fill macros', style: GoogleFonts.inter(color: ApexColors.purple, fontWeight: FontWeight.w700, fontSize: 12))],
                       ),
                     ),
                   ),
@@ -193,7 +193,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
             ),
           ],
           const SizedBox(height: 14),
-          Text('Today (${todayLogs.length} meals)', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w700, fontSize: 13, color: ApexColors.t1)),
+          Text('Today (${todayLogs.length} meals)', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: ApexColors.t1)),
           const SizedBox(height: 9),
           if (_loading)
             const Center(child: Padding(padding: EdgeInsets.all(18), child: CircularProgressIndicator(color: ApexColors.accent)))
@@ -217,7 +217,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
                     const SizedBox(width: 10),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       RichText(text: TextSpan(children: [
-                        TextSpan(text: l['meal_name'] ?? '', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w700, fontSize: 12, color: ApexColors.t1)),
+                        TextSpan(text: l['meal_name'] ?? '', style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 12, color: ApexColors.t1)),
                         if (l['quantity'] != null) TextSpan(text: ' · ${l['quantity']}', style: TextStyle(color: ApexColors.t3, fontSize: 11)),
                       ])),
                       Row(children: [
@@ -243,9 +243,9 @@ class _NutritionScreenState extends State<NutritionScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label.toUpperCase(), style: GoogleFonts.spaceGrotesk(fontSize: 11, color: ApexColors.t2, fontWeight: FontWeight.w700, letterSpacing: 0.7)),
+        Text(label.toUpperCase(), style: GoogleFonts.inter(fontSize: 11, color: ApexColors.t2, fontWeight: FontWeight.w700, letterSpacing: 0.7)),
         const SizedBox(height: 4),
-        TextField(controller: c, keyboardType: number ? TextInputType.number : TextInputType.text, style: GoogleFonts.spaceGrotesk(fontSize: 12, color: ApexColors.t1), decoration: InputDecoration(hintText: hint, contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7))),
+        TextField(controller: c, keyboardType: number ? TextInputType.number : TextInputType.text, style: GoogleFonts.inter(fontSize: 12, color: ApexColors.t1), decoration: InputDecoration(hintText: hint, contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7))),
       ],
     );
   }

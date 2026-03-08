@@ -190,7 +190,7 @@ class _ApexOrbLogoState extends State<ApexOrbLogo>
     return Center(
       child: Text(
         initials,
-        style: GoogleFonts.spaceGrotesk(
+        style: GoogleFonts.inter(
           fontSize: widget.size * 0.23,
           fontWeight: FontWeight.w700,
           color: _textColor,

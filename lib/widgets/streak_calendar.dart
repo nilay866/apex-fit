@@ -85,7 +85,7 @@ class StreakCalendar extends StatelessWidget {
                   children: [
                     Text(
                       'Training calendar',
-                      style: GoogleFonts.spaceGrotesk(
+                      style: GoogleFonts.inter(
                         fontWeight: FontWeight.w700,
                         fontSize: 18,
                         color: ApexColors.t1,
@@ -94,7 +94,7 @@ class StreakCalendar extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       'A quick view of your last five training weeks.',
-                      style: GoogleFonts.spaceGrotesk(
+                      style: GoogleFonts.inter(
                         fontSize: 12,
                         color: ApexColors.t2,
                       ),
@@ -117,7 +117,7 @@ class StreakCalendar extends StatelessWidget {
                     child: Text(
                       label,
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.spaceGrotesk(
+                      style: GoogleFonts.inter(
                         fontSize: 10,
                         color: label == 'S' ? ApexColors.t3 : ApexColors.t2,
                         fontWeight: FontWeight.w700,
@@ -175,7 +175,7 @@ class StreakCalendar extends StatelessWidget {
           Center(
             child: Text(
               'Sundays stay clear for recovery.',
-              style: GoogleFonts.spaceGrotesk(
+              style: GoogleFonts.inter(
                 fontSize: 11,
                 color: ApexColors.t3,
                 fontWeight: FontWeight.w600,
@@ -210,7 +210,7 @@ class StreakCalendar extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           label,
-          style: GoogleFonts.spaceGrotesk(
+          style: GoogleFonts.inter(
             fontSize: 10,
             color: ApexColors.t3,
             fontWeight: FontWeight.w600,

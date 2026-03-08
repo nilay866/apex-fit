@@ -119,9 +119,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<String> _encodeAvatar(XFile file) async {
     final compressedBytes = await FlutterImageCompress.compressWithFile(
       file.path,
-      quality: 82,
-      minWidth: 1200,
-      minHeight: 1200,
+      quality: 75,
+      minWidth: 400,
+      minHeight: 400,
       format: CompressFormat.jpeg,
     );
     final bytes = compressedBytes ?? await file.readAsBytes();
@@ -972,72 +972,72 @@ class _ProfilePalette {
 }
 
 class _ProfileText {
-  static final TextStyle pageTitle = GoogleFonts.spaceGrotesk(
+  static final TextStyle pageTitle = GoogleFonts.inter(
     fontSize: 26,
     fontWeight: FontWeight.w700,
     color: _ProfilePalette.text,
     letterSpacing: -0.8,
   );
 
-  static final TextStyle heroName = GoogleFonts.spaceGrotesk(
+  static final TextStyle heroName = GoogleFonts.inter(
     fontSize: 30,
     fontWeight: FontWeight.w700,
     color: _ProfilePalette.text,
     letterSpacing: -0.9,
   );
 
-  static final TextStyle sectionTitle = GoogleFonts.spaceGrotesk(
+  static final TextStyle sectionTitle = GoogleFonts.inter(
     fontSize: 22,
     fontWeight: FontWeight.w700,
     color: _ProfilePalette.text,
     letterSpacing: -0.4,
   );
 
-  static final TextStyle title = GoogleFonts.spaceGrotesk(
+  static final TextStyle title = GoogleFonts.inter(
     fontSize: 18,
     fontWeight: FontWeight.w700,
     color: _ProfilePalette.text,
   );
 
-  static final TextStyle body = GoogleFonts.spaceGrotesk(
+  static final TextStyle body = GoogleFonts.inter(
     fontSize: 14,
     color: _ProfilePalette.textSoft,
     height: 1.5,
   );
 
-  static final TextStyle bodyStrong = GoogleFonts.spaceGrotesk(
+  static final TextStyle bodyStrong = GoogleFonts.inter(
     fontSize: 14,
     color: _ProfilePalette.text,
     fontWeight: FontWeight.w600,
     height: 1.45,
   );
 
-  static final TextStyle caption = GoogleFonts.spaceGrotesk(
+  static final TextStyle caption = GoogleFonts.inter(
     fontSize: 11,
     color: _ProfilePalette.textSoft,
     fontWeight: FontWeight.w500,
   );
 
-  static final TextStyle captionStrong = GoogleFonts.spaceGrotesk(
+  static final TextStyle captionStrong = GoogleFonts.inter(
     fontSize: 11,
     color: _ProfilePalette.text,
     fontWeight: FontWeight.w600,
   );
 
-  static final TextStyle label = GoogleFonts.spaceGrotesk(
+  static final TextStyle label = GoogleFonts.inter(
     fontSize: 10,
     color: _ProfilePalette.hint,
     fontWeight: FontWeight.w700,
     letterSpacing: 0.8,
   );
 
-  static final TextStyle input = GoogleFonts.spaceGrotesk(
+  static final TextStyle input = GoogleFonts.inter(
     fontSize: 15,
     color: _ProfilePalette.text,
     fontWeight: FontWeight.w600,
   );
 
-  static final TextStyle inputHint = GoogleFonts.spaceGrotesk(
+  static final TextStyle inputHint = GoogleFonts.inter(
     fontSize: 14,
     color: _ProfilePalette.hint,
     fontWeight: FontWeight.w500,
@@ -1049,37 +1049,37 @@ class _ProfileText {
     color: _ProfilePalette.text,
   );
 
-  static final TextStyle tab = GoogleFonts.spaceGrotesk(
+  static final TextStyle tab = GoogleFonts.inter(
     fontSize: 13,
     fontWeight: FontWeight.w600,
     color: _ProfilePalette.textSoft,
   );
 
-  static final TextStyle tabActive = GoogleFonts.spaceGrotesk(
+  static final TextStyle tabActive = GoogleFonts.inter(
     fontSize: 13,
     fontWeight: FontWeight.w700,
     color: _ProfilePalette.text,
   );
 
-  static final TextStyle goal = GoogleFonts.spaceGrotesk(
+  static final TextStyle goal = GoogleFonts.inter(
     fontSize: 13,
     fontWeight: FontWeight.w600,
     color: _ProfilePalette.textSoft,
   );
 
-  static final TextStyle goalActive = GoogleFonts.spaceGrotesk(
+  static final TextStyle goalActive = GoogleFonts.inter(
     fontSize: 13,
     fontWeight: FontWeight.w700,
     color: _ProfilePalette.text,
   );
 
-  static final TextStyle onDark = GoogleFonts.spaceGrotesk(
+  static final TextStyle onDark = GoogleFonts.inter(
     fontSize: 13,
     color: Colors.white,
     fontWeight: FontWeight.w600,
   );
 
-  static final TextStyle success = GoogleFonts.spaceGrotesk(
+  static final TextStyle success = GoogleFonts.inter(
     fontSize: 11,
     color: _ProfilePalette.success,
     fontWeight: FontWeight.w700,

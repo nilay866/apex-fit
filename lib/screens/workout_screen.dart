@@ -99,7 +99,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                   const SizedBox(height: 12),
                   Text(
                     'No workouts yet',
-                    style: GoogleFonts.spaceGrotesk(
+                    style: GoogleFonts.inter(
                       fontWeight: FontWeight.w800,
                       color: ApexColors.t1,
                     ),
@@ -108,7 +108,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                   Text(
                     'Create your first workout with exercises, sets, and reps.',
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.spaceGrotesk(
+                    style: GoogleFonts.inter(
                       fontSize: 12,
                       color: ApexColors.t2,
                       height: 1.5,
@@ -144,7 +144,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                               children: [
                                 Text(
                                   w['name'] ?? '',
-                                  style: GoogleFonts.spaceGrotesk(
+                                  style: GoogleFonts.inter(
                                     fontWeight: FontWeight.w800,
                                     fontSize: 15,
                                     color: ApexColors.t1,
@@ -153,7 +153,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                                 const SizedBox(height: 4),
                                 Text(
                                   '${exercises.length} exercises',
-                                  style: GoogleFonts.spaceGrotesk(
+                                  style: GoogleFonts.inter(
                                     fontSize: 12,
                                     color: ApexColors.t2,
                                   ),
@@ -187,7 +187,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                                   ),
                                   child: Text(
                                     '${e['name']} · ${e['sets']} sets',
-                                    style: GoogleFonts.spaceGrotesk(
+                                    style: GoogleFonts.inter(
                                       fontSize: 10,
                                       color: ApexColors.t2,
                                       fontWeight: FontWeight.w700,
@@ -249,7 +249,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
             const SizedBox(height: 16),
             Text(
               workout['name'] ?? '',
-              style: GoogleFonts.spaceGrotesk(
+              style: GoogleFonts.inter(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
                 color: ApexColors.t1,
@@ -278,7 +278,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                       children: [
                         Text(
                           entry.value['name'] ?? '',
-                          style: GoogleFonts.spaceGrotesk(
+                          style: GoogleFonts.inter(
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
                             color: ApexColors.t1,
@@ -287,7 +287,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                         const SizedBox(height: 4),
                         Text(
                           '${entry.value['sets']} sets · ${entry.value['reps']} reps${entry.value['target_weight'] != null ? ' · ${entry.value['target_weight']}kg' : ''}',
-                          style: GoogleFonts.spaceGrotesk(
+                          style: GoogleFonts.inter(
                             fontSize: 11,
                             color: ApexColors.t2,
                           ),
@@ -296,7 +296,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                     ),
                     Text(
                       '#${entry.key + 1}',
-                      style: GoogleFonts.spaceGrotesk(
+                      style: GoogleFonts.inter(
                         fontSize: 11,
                         color: ApexColors.t3,
                         fontWeight: FontWeight.w700,
@@ -430,7 +430,7 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
             const SizedBox(height: 16),
             Text(
               'New workout',
-              style: GoogleFonts.spaceGrotesk(
+              style: GoogleFonts.inter(
                 fontSize: 18,
                 fontWeight: FontWeight.w800,
                 color: ApexColors.t1,
@@ -439,7 +439,7 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
             const SizedBox(height: 16),
             Text(
               'WORKOUT NAME',
-              style: GoogleFonts.spaceGrotesk(
+              style: GoogleFonts.inter(
                 fontSize: 11,
                 color: ApexColors.t2,
                 fontWeight: FontWeight.w700,
@@ -448,7 +448,7 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
             const SizedBox(height: 6),
             TextField(
               controller: _nameC,
-              style: GoogleFonts.spaceGrotesk(fontSize: 13, color: ApexColors.t1),
+              style: GoogleFonts.inter(fontSize: 13, color: ApexColors.t1),
               decoration: const InputDecoration(hintText: 'Upper Body Strength'),
             ),
             const SizedBox(height: 16),
@@ -457,7 +457,7 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
               children: [
                 Text(
                   'EXERCISES',
-                  style: GoogleFonts.spaceGrotesk(
+                  style: GoogleFonts.inter(
                     fontSize: 11,
                     color: ApexColors.t2,
                     fontWeight: FontWeight.w700,
@@ -474,7 +474,7 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
                     ),
                     child: Text(
                       '+ Exercise',
-                      style: GoogleFonts.spaceGrotesk(
+                      style: GoogleFonts.inter(
                         color: ApexColors.accent,
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -504,7 +504,7 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
                         Expanded(
                           child: TextField(
                             controller: exercise.name,
-                            style: GoogleFonts.spaceGrotesk(fontSize: 13, color: ApexColors.t1),
+                            style: GoogleFonts.inter(fontSize: 13, color: ApexColors.t1),
                             decoration: InputDecoration(
                               hintText: 'Exercise name',
                               filled: true,
@@ -541,7 +541,7 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
                     const SizedBox(height: 12),
                     Text(
                       'SETS',
-                      style: GoogleFonts.spaceGrotesk(
+                      style: GoogleFonts.inter(
                         fontSize: 10,
                         color: ApexColors.t3,
                         fontWeight: FontWeight.w700,
@@ -570,14 +570,14 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
                         const SizedBox(width: 12),
                         Text(
                           'Use + to add extra sets',
-                          style: GoogleFonts.spaceGrotesk(fontSize: 11, color: ApexColors.t2),
+                          style: GoogleFonts.inter(fontSize: 11, color: ApexColors.t2),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
                     Text(
                       'REPS',
-                      style: GoogleFonts.spaceGrotesk(
+                      style: GoogleFonts.inter(
                         fontSize: 10,
                         color: ApexColors.t3,
                         fontWeight: FontWeight.w700,
@@ -605,7 +605,7 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
                             ),
                             child: Text(
                               rep,
-                              style: GoogleFonts.spaceGrotesk(
+                              style: GoogleFonts.inter(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                                 color: selected ? ApexColors.ink : ApexColors.t2,
@@ -622,7 +622,7 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
                           child: TextField(
                             controller: exercise.reps,
                             keyboardType: TextInputType.text,
-                            style: GoogleFonts.spaceGrotesk(fontSize: 13, color: ApexColors.t1),
+                            style: GoogleFonts.inter(fontSize: 13, color: ApexColors.t1),
                             decoration: const InputDecoration(
                               hintText: 'Custom reps or range, e.g. 8-12',
                             ),
@@ -634,7 +634,7 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
                           child: TextField(
                             controller: exercise.weight,
                             keyboardType: TextInputType.number,
-                            style: GoogleFonts.spaceGrotesk(fontSize: 13, color: ApexColors.t1),
+                            style: GoogleFonts.inter(fontSize: 13, color: ApexColors.t1),
                             decoration: const InputDecoration(hintText: 'Load kg'),
                           ),
                         ),

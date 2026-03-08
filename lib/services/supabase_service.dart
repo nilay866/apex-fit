@@ -77,6 +77,13 @@ class SupabaseService {
     await client.auth.signOut();
   }
 
+  static Future<bool> signInWithOAuth(OAuthProvider provider) async {
+    return await client.auth.signInWithOAuth(
+      provider,
+      redirectTo: 'apexfit://login-callback/',
+    );
+  }
+
   static User? get currentUser => client.auth.currentUser;
   static String? get accessToken => client.auth.currentSession?.accessToken;
 

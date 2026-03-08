@@ -152,11 +152,11 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
                       child: const Center(child: Text('⚡', style: TextStyle(fontSize: 23))),
                     ),
                     const SizedBox(width: 10),
-                    Text('APEX AI', style: GoogleFonts.spaceGrotesk(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: 2, color: ApexColors.t1)),
+                    Text('APEX AI', style: GoogleFonts.inter(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: 2, color: ApexColors.t1)),
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text('AI-Powered Fitness Coach', style: GoogleFonts.spaceGrotesk(fontSize: 12, color: ApexColors.t2)),
+                Text('AI-Powered Fitness Coach', style: GoogleFonts.inter(fontSize: 12, color: ApexColors.t2)),
                 const SizedBox(height: 24),
                 ApexCard(
                   child: Column(
@@ -177,7 +177,7 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
                         ),
                         const SizedBox(height: 6),
                         Text('⚠️ Free projects pause after 1 week — Resume at supabase.com if needed',
-                            style: GoogleFonts.spaceGrotesk(fontSize: 10, color: ApexColors.yellow, height: 1.5)),
+                            style: GoogleFonts.inter(fontSize: 10, color: ApexColors.yellow, height: 1.5)),
                       ]),
                       _step(2, 'Run SQL schema', [
                         GestureDetector(
@@ -278,10 +278,10 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
               Container(
                 width: 24, height: 24,
                 decoration: const BoxDecoration(color: ApexColors.accent, shape: BoxShape.circle),
-                child: Center(child: Text('$n', style: GoogleFonts.spaceGrotesk(fontSize: 11, fontWeight: FontWeight.w800, color: ApexColors.bg))),
+                child: Center(child: Text('$n', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: ApexColors.bg))),
               ),
               const SizedBox(width: 9),
-              Text(title, style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w700, fontSize: 13, color: ApexColors.t1)),
+              Text(title, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: ApexColors.t1)),
             ],
           ),
           const SizedBox(height: 11),
@@ -295,11 +295,11 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label.toUpperCase(), style: GoogleFonts.spaceGrotesk(fontSize: 11, color: ApexColors.t2, fontWeight: FontWeight.w700, letterSpacing: 0.7)),
+        Text(label.toUpperCase(), style: GoogleFonts.inter(fontSize: 11, color: ApexColors.t2, fontWeight: FontWeight.w700, letterSpacing: 0.7)),
         const SizedBox(height: 4),
         TextField(
           controller: controller,
-          style: (mono ? GoogleFonts.dmMono : GoogleFonts.spaceGrotesk)(fontSize: 13, color: ApexColors.t1),
+          style: (mono ? GoogleFonts.dmMono : GoogleFonts.inter)(fontSize: 13, color: ApexColors.t1),
           decoration: InputDecoration(hintText: hint),
         ),
       ],
@@ -319,9 +319,9 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
             if (loading) ...[
               SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: color)),
               const SizedBox(width: 7),
-              Text('Testing...', style: GoogleFonts.spaceGrotesk(color: color, fontWeight: FontWeight.w700, fontSize: 11)),
+              Text('Testing...', style: GoogleFonts.inter(color: color, fontWeight: FontWeight.w700, fontSize: 11)),
             ] else
-              Text(text, style: GoogleFonts.spaceGrotesk(color: color, fontWeight: FontWeight.w700, fontSize: 11)),
+              Text(text, style: GoogleFonts.inter(color: color, fontWeight: FontWeight.w700, fontSize: 11)),
           ],
         ),
       ),

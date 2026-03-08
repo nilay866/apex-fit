@@ -67,7 +67,7 @@ class ApexTrendChart extends StatelessWidget {
                     space: 8,
                     child: Text(
                       label,
-                      style: GoogleFonts.spaceGrotesk(
+                      style: GoogleFonts.inter(
                         fontSize: compact ? 9 : 10,
                         color: ApexColors.t3,
                         fontWeight: FontWeight.w700,

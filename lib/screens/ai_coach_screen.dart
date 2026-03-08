@@ -73,7 +73,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
               const SizedBox(width: 11),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Coach', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w800, fontSize: 20, color: ApexColors.t1)),
+                  Text('Coach', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 20, color: ApexColors.t1)),
                   const SizedBox(height: 4),
                   Text('Context-aware training help for your current profile.', style: TextStyle(fontSize: 11, color: ApexColors.t2)),
                 ]),
@@ -157,7 +157,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                   controller: _inputC,
                   onChanged: (_) => setState(() {}),
                   onSubmitted: (_) => _send(),
-                  style: GoogleFonts.spaceGrotesk(fontSize: 12, color: ApexColors.t1),
+                  style: GoogleFonts.inter(fontSize: 12, color: ApexColors.t1),
                   decoration: InputDecoration(
                     hintText: 'Ask your AI coach...',
                     contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),

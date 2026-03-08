@@ -219,7 +219,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         children: [
                           Text(
                             'Meals and calories',
-                            style: GoogleFonts.spaceGrotesk(
+                            style: GoogleFonts.inter(
                               fontWeight: FontWeight.w800,
                               fontSize: 18,
                               color: ApexColors.t1,
@@ -228,7 +228,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           const SizedBox(height: 4),
                           Text(
                             'Meal bars with calorie lines attached below for quick reading.',
-                            style: GoogleFonts.spaceGrotesk(
+                            style: GoogleFonts.inter(
                               fontSize: 12,
                               color: ApexColors.t2,
                             ),
@@ -239,13 +239,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Text('${_nLogs.length} meals', style: ApexTheme.mono(size: 16, color: ApexColors.orange)),
-                          Text('$avgCal avg kcal/day', style: GoogleFonts.spaceGrotesk(fontSize: 10, color: ApexColors.t3, fontWeight: FontWeight.w700)),
+                          Text('$avgCal avg kcal/day', style: GoogleFonts.inter(fontSize: 10, color: ApexColors.t3, fontWeight: FontWeight.w700)),
                         ],
                       ),
                     ],
                   ),
                   const SizedBox(height: 14),
-                  Text('Meals', style: GoogleFonts.spaceGrotesk(fontSize: 11, color: ApexColors.t3, fontWeight: FontWeight.w700)),
+                  Text('Meals', style: GoogleFonts.inter(fontSize: 11, color: ApexColors.t3, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
                   ApexTrendChart(
                     values: mealValues,
@@ -255,7 +255,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     compact: true,
                   ),
                   const SizedBox(height: 12),
-                  Text('Calories line', style: GoogleFonts.spaceGrotesk(fontSize: 11, color: ApexColors.t3, fontWeight: FontWeight.w700)),
+                  Text('Calories line', style: GoogleFonts.inter(fontSize: 11, color: ApexColors.t3, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
                   ApexLineTrendChart(
                     values: calorieValues,
@@ -302,7 +302,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         children: [
                           Text(
                             'Body weight graph',
-                            style: GoogleFonts.spaceGrotesk(
+                            style: GoogleFonts.inter(
                               fontWeight: FontWeight.w800,
                               fontSize: 18,
                               color: ApexColors.t1,
@@ -311,7 +311,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           const SizedBox(height: 4),
                           Text(
                             'Smooth line for weight movement with quick logging.',
-                            style: GoogleFonts.spaceGrotesk(
+                            style: GoogleFonts.inter(
                               fontSize: 12,
                               color: ApexColors.t2,
                             ),
@@ -351,7 +351,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     Center(
                       child: Text(
                         'Log 2+ weigh-ins to see the graph',
-                        style: GoogleFonts.spaceGrotesk(fontSize: 12, color: ApexColors.t3),
+                        style: GoogleFonts.inter(fontSize: 12, color: ApexColors.t3),
                       ),
                     )
                   else ...[
@@ -389,7 +389,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   children: [
                     Text(
                       'Macro board',
-                      style: GoogleFonts.spaceGrotesk(
+                      style: GoogleFonts.inter(
                         fontWeight: FontWeight.w800,
                         fontSize: 13,
                         color: ApexColors.t1,
@@ -425,7 +425,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   children: [
                     Text(
                       'Achievement board',
-                      style: GoogleFonts.spaceGrotesk(
+                      style: GoogleFonts.inter(
                         fontWeight: FontWeight.w800,
                         fontSize: 18,
                         color: ApexColors.t1,
@@ -436,7 +436,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       achievements.isEmpty
                           ? 'No trophies unlocked in this window yet. Keep stacking workouts and meals.'
                           : '${achievements.length} unlocked for this period. Your completed goals surface here like a game dashboard.',
-                      style: GoogleFonts.spaceGrotesk(
+                      style: GoogleFonts.inter(
                         fontSize: 12,
                         color: ApexColors.t2,
                         height: 1.5,
@@ -459,7 +459,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
               child: Text(
                 'Try hitting 4 workouts, 5 meal-tracking days, 2.2L average hydration, or multiple weigh-ins to unlock your first trophy.',
-                style: GoogleFonts.spaceGrotesk(fontSize: 12, color: ApexColors.t2, height: 1.55),
+                style: GoogleFonts.inter(fontSize: 12, color: ApexColors.t2, height: 1.55),
               ),
             )
           else
@@ -506,7 +506,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           const SizedBox(height: 12),
                           Text(
                             achievement.title,
-                            style: GoogleFonts.spaceGrotesk(
+                            style: GoogleFonts.inter(
                               fontWeight: FontWeight.w700,
                               fontSize: 14,
                               color: ApexColors.t1,
@@ -515,7 +515,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           const SizedBox(height: 6),
                           Text(
                             achievement.detail,
-                            style: GoogleFonts.spaceGrotesk(
+                            style: GoogleFonts.inter(
                               fontSize: 11,
                               color: ApexColors.t2,
                               height: 1.5,
@@ -555,7 +555,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   children: [
                     Text(
                       title,
-                      style: GoogleFonts.spaceGrotesk(
+                      style: GoogleFonts.inter(
                         fontWeight: FontWeight.w800,
                         fontSize: 18,
                         color: ApexColors.t1,
@@ -564,7 +564,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: GoogleFonts.spaceGrotesk(fontSize: 12, color: ApexColors.t2),
+                      style: GoogleFonts.inter(fontSize: 12, color: ApexColors.t2),
                     ),
                   ],
                 ),
@@ -739,7 +739,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 Text(value, style: ApexTheme.mono(size: 16, color: color)),
                 Text(
                   label.toUpperCase(),
-                  style: GoogleFonts.spaceGrotesk(
+                  style: GoogleFonts.inter(
                     fontSize: 9,
                     color: ApexColors.t3,
                     fontWeight: FontWeight.w700,

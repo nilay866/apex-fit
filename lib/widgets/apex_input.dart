@@ -36,7 +36,7 @@ class ApexInput extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 4),
             child: Text(
               label!.toUpperCase(),
-              style: GoogleFonts.spaceGrotesk(
+              style: GoogleFonts.inter(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: ApexColors.t2,
@@ -50,7 +50,7 @@ class ApexInput extends StatelessWidget {
           keyboardType: keyboardType,
           obscureText: obscure,
           maxLines: obscure ? 1 : (maxLines ?? 1),
-          style: (mono ? GoogleFonts.dmMono : GoogleFonts.spaceGrotesk)(
+          style: (mono ? GoogleFonts.dmMono : GoogleFonts.inter)(
             fontSize: small ? 12 : 13,
             color: ApexColors.t1,
           ),

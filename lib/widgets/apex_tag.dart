@@ -19,7 +19,7 @@ class ApexTag extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: GoogleFonts.spaceGrotesk(
+        style: GoogleFonts.inter(
           color: color,
           fontSize: 11,
           fontWeight: FontWeight.w700,

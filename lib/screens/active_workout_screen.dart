@@ -149,7 +149,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(widget.workout['name'] ?? '', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w800, fontSize: 16, color: ApexColors.t1)),
+                        Text(widget.workout['name'] ?? '', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16, color: ApexColors.t1)),
                         Text('$_doneCount/$_totalCount sets · ${_totalVol}kg', style: TextStyle(color: ApexColors.t2, fontSize: 10)),
                       ]),
                       Text(_fmt(_timer), style: ApexTheme.mono(size: 24, color: ApexColors.accent)),
@@ -231,7 +231,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                   : ListView(
                       padding: const EdgeInsets.all(16),
                       children: [
-                        Text(ex['name'] ?? '', style: GoogleFonts.spaceGrotesk(fontSize: 20, fontWeight: FontWeight.w800, color: ApexColors.t1)),
+                        Text(ex['name'] ?? '', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: ApexColors.t1)),
                         Text('Edit each set independently', style: TextStyle(color: ApexColors.t2, fontSize: 10)),
                         const SizedBox(height: 12),
                         // Header
@@ -344,10 +344,10 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Save this session?', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w800, fontSize: 12, color: ApexColors.t1)),
+                    Text('Save this session?', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 12, color: ApexColors.t1)),
                     Text('${_fmt(_timer)} · $_doneCount sets · ${_totalVol}kg', style: TextStyle(color: ApexColors.t2, fontSize: 10)),
                     const SizedBox(height: 9),
-                    Text('INTENSITY', style: GoogleFonts.spaceGrotesk(fontSize: 10, color: ApexColors.t2, fontWeight: FontWeight.w700)),
+                    Text('INTENSITY', style: GoogleFonts.inter(fontSize: 10, color: ApexColors.t2, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 6),
                     Row(children: [
                       ['light', 'Light', ApexColors.accentSoft],
@@ -371,7 +371,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                     const SizedBox(height: 9),
                     TextField(
                       onChanged: (v) => _notes = v,
-                      style: GoogleFonts.spaceGrotesk(fontSize: 13, color: ApexColors.t1),
+                      style: GoogleFonts.inter(fontSize: 13, color: ApexColors.t1),
                       decoration: const InputDecoration(hintText: 'Session notes'),
                     ),
                     const SizedBox(height: 10),

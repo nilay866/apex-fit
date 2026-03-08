@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/colors.dart';
 import '../services/supabase_service.dart';
 import '../widgets/apex_backdrop.dart';
@@ -129,7 +130,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     const SizedBox(height: 20),
                     Text(
                       'APEX AI',
-                      style: GoogleFonts.spaceGrotesk(
+                      style: GoogleFonts.inter(
                         fontSize: 34,
                         fontWeight: FontWeight.w700,
                         color: ApexColors.t1,
@@ -202,7 +203,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             const SizedBox(height: 6),
                             TextField(
                               controller: _nameC,
-                              style: GoogleFonts.spaceGrotesk(fontSize: 14, color: ApexColors.t1),
+                              style: GoogleFonts.inter(fontSize: 14, color: ApexColors.t1),
                               decoration: const InputDecoration(hintText: 'Nilay Chavhan'),
                             ),
                             const SizedBox(height: 14),
@@ -212,7 +213,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           TextField(
                             controller: _emailC,
                             keyboardType: TextInputType.emailAddress,
-                            style: GoogleFonts.spaceGrotesk(fontSize: 14, color: ApexColors.t1),
+                            style: GoogleFonts.inter(fontSize: 14, color: ApexColors.t1),
                             decoration: const InputDecoration(hintText: 'you@example.com'),
                           ),
                           const SizedBox(height: 14),
@@ -221,7 +222,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           TextField(
                             controller: _pwC,
                             obscureText: true,
-                            style: GoogleFonts.spaceGrotesk(fontSize: 14, color: ApexColors.t1),
+                            style: GoogleFonts.inter(fontSize: 14, color: ApexColors.t1),
                             decoration: const InputDecoration(hintText: 'Minimum 6 characters'),
                           ),
                           if (!_isLogin) ...[
@@ -247,7 +248,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                     ),
                                     child: Text(
                                       goal,
-                                      style: GoogleFonts.spaceGrotesk(
+                                      style: GoogleFonts.inter(
                                         color: selected ? ApexColors.t1 : ApexColors.t2,
                                         fontSize: 12,
                                         fontWeight: FontWeight.w600,
@@ -260,11 +261,42 @@ class _AuthScreenState extends State<AuthScreen> {
                           ],
                           const SizedBox(height: 18),
                           ApexButton(
-                            text: _isLogin ? 'Sign in' : 'Create account',
+                            text: _isLogin ? 'Sign in with Email' : 'Create account',
                             onPressed: _submit,
                             full: true,
                             loading: _loading,
                           ),
+                          if (_isLogin) ...[
+                            const SizedBox(height: 24),
+                            Row(
+                              children: [
+                                Expanded(child: Container(height: 1, color: ApexColors.border)),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                                  child: Text('OR', style: GoogleFonts.inter(fontSize: 11, color: ApexColors.t3, fontWeight: FontWeight.w700)),
+                                ),
+                                Expanded(child: Container(height: 1, color: ApexColors.border)),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            ApexButton(
+                              text: 'Continue with Google',
+                              icon: Icons.g_mobiledata_rounded,
+                              tone: ApexButtonTone.outline,
+                              color: ApexColors.t1,
+                              full: true,
+                              onPressed: () => SupabaseService.signInWithOAuth(OAuthProvider.google),
+                            ),
+                            const SizedBox(height: 12),
+                            ApexButton(
+                              text: 'Continue with Apple',
+                              icon: Icons.apple_rounded,
+                              tone: ApexButtonTone.outline,
+                              color: ApexColors.t1,
+                              full: true,
+                              onPressed: () => SupabaseService.signInWithOAuth(OAuthProvider.apple),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -301,7 +333,7 @@ class _AuthScreenState extends State<AuthScreen> {
           child: Text(
             text,
             textAlign: TextAlign.center,
-            style: GoogleFonts.spaceGrotesk(
+            style: GoogleFonts.inter(
               fontWeight: FontWeight.w700,
               fontSize: 12,
               color: active ? ApexColors.ink : ApexColors.t2,
@@ -315,7 +347,7 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget _fieldLabel(String text) {
     return Text(
       text.toUpperCase(),
-      style: GoogleFonts.spaceGrotesk(
+      style: GoogleFonts.inter(
         fontSize: 10,
         color: ApexColors.t3,
         fontWeight: FontWeight.w700,
@@ -337,7 +369,7 @@ class _AuthScreenState extends State<AuthScreen> {
           Expanded(
             child: Text(
               message,
-              style: GoogleFonts.spaceGrotesk(
+              style: GoogleFonts.inter(
                 color: ApexColors.t1,
                 fontSize: 12,
                 height: 1.5,

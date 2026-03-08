@@ -16,53 +16,53 @@ class ApexTheme {
         error: ApexColors.red,
       ),
       dividerColor: ApexColors.border,
-      textTheme: GoogleFonts.spaceGroteskTextTheme(base.textTheme).copyWith(
-        displayLarge: GoogleFonts.spaceGrotesk(
+      textTheme: GoogleFonts.interTextTheme(base.textTheme).copyWith(
+        displayLarge: GoogleFonts.inter(
           fontSize: 34,
           fontWeight: FontWeight.w700,
           color: ApexColors.t1,
           height: 0.94,
           letterSpacing: -1.2,
         ),
-        headlineMedium: GoogleFonts.spaceGrotesk(
+        headlineMedium: GoogleFonts.inter(
           fontSize: 22,
           fontWeight: FontWeight.w700,
           color: ApexColors.t1,
           height: 1.0,
           letterSpacing: -0.4,
         ),
-        titleLarge: GoogleFonts.spaceGrotesk(
+        titleLarge: GoogleFonts.inter(
           fontSize: 18,
           fontWeight: FontWeight.w700,
           color: ApexColors.t1,
         ),
-        titleMedium: GoogleFonts.spaceGrotesk(
+        titleMedium: GoogleFonts.inter(
           fontSize: 15,
           fontWeight: FontWeight.w600,
           color: ApexColors.t1,
         ),
-        bodyLarge: GoogleFonts.spaceGrotesk(
+        bodyLarge: GoogleFonts.inter(
           fontSize: 14,
           color: ApexColors.t1,
           height: 1.5,
         ),
-        bodyMedium: GoogleFonts.spaceGrotesk(
+        bodyMedium: GoogleFonts.inter(
           fontSize: 13,
           color: ApexColors.t2,
           height: 1.55,
         ),
-        bodySmall: GoogleFonts.spaceGrotesk(
+        bodySmall: GoogleFonts.inter(
           fontSize: 11,
           color: ApexColors.t2,
           height: 1.5,
         ),
-        labelLarge: GoogleFonts.spaceGrotesk(
+        labelLarge: GoogleFonts.inter(
           fontSize: 12,
           fontWeight: FontWeight.w600,
           color: ApexColors.t1,
           letterSpacing: 0.1,
         ),
-        labelSmall: GoogleFonts.spaceGrotesk(
+        labelSmall: GoogleFonts.inter(
           fontSize: 10,
           fontWeight: FontWeight.w700,
           color: ApexColors.t3,
@@ -109,13 +109,13 @@ class ApexTheme {
           borderSide: const BorderSide(color: ApexColors.red, width: 1.2),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        labelStyle: GoogleFonts.spaceGrotesk(
+        labelStyle: GoogleFonts.inter(
           fontSize: 11,
           fontWeight: FontWeight.w700,
           color: ApexColors.t2,
           letterSpacing: 0.8,
         ),
-        hintStyle: GoogleFonts.spaceGrotesk(
+        hintStyle: GoogleFonts.inter(
           fontSize: 13,
           color: ApexColors.t3,
           fontWeight: FontWeight.w500,
@@ -123,7 +123,7 @@ class ApexTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: ApexColors.accent,
-        contentTextStyle: GoogleFonts.spaceGrotesk(color: ApexColors.ink),
+        contentTextStyle: GoogleFonts.inter(color: ApexColors.ink),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       ),

@@ -28,7 +28,7 @@ class MacroBar extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: GoogleFonts.spaceGrotesk(
+                style: GoogleFonts.inter(
                   fontSize: 12,
                   color: ApexColors.t2,
                   fontWeight: FontWeight.w600,

@@ -111,13 +111,13 @@ class _PhotosScreenState extends State<PhotosScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Add progress photo', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w800, fontSize: 18, color: ApexColors.t1)),
+                Text('Add progress photo', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18, color: ApexColors.t1)),
                 const SizedBox(height: 4),
-                Text('Capture a new frame or pull one from your library.', style: GoogleFonts.spaceGrotesk(fontSize: 12, color: ApexColors.t2)),
+                Text('Capture a new frame or pull one from your library.', style: GoogleFonts.inter(fontSize: 12, color: ApexColors.t2)),
                 const SizedBox(height: 14),
                 TextField(
                   controller: _captionC,
-                  style: GoogleFonts.spaceGrotesk(fontSize: 13, color: ApexColors.t1),
+                  style: GoogleFonts.inter(fontSize: 13, color: ApexColors.t1),
                   decoration: const InputDecoration(hintText: 'Caption (optional) e.g. Week 4 front pose'),
                 ),
                 const SizedBox(height: 10),
@@ -143,7 +143,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
                 children: [
                   const Icon(Icons.photo_camera_back_rounded, size: 48, color: ApexColors.accentSoft),
                   const SizedBox(height: 12),
-                  Text('No photos yet', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w800, color: ApexColors.t1)),
+                  Text('No photos yet', style: GoogleFonts.inter(fontWeight: FontWeight.w800, color: ApexColors.t1)),
                   const SizedBox(height: 7),
                   Text('Take a photo today and start tracking\nyour transformation!', textAlign: TextAlign.center, style: TextStyle(color: ApexColors.t2, fontSize: 12, height: 1.6)),
                 ],

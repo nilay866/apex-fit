@@ -27,7 +27,7 @@ class ApexScreenHeader extends StatelessWidget {
             children: [
               Text(
                 eyebrow.toUpperCase(),
-                style: GoogleFonts.spaceGrotesk(
+                style: GoogleFonts.inter(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                   color: ApexColors.t3,
@@ -37,7 +37,7 @@ class ApexScreenHeader extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 title,
-                style: GoogleFonts.spaceGrotesk(
+                style: GoogleFonts.inter(
                   fontSize: 32,
                   fontWeight: FontWeight.w700,
                   color: ApexColors.t1,
@@ -48,7 +48,7 @@ class ApexScreenHeader extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 subtitle,
-                style: GoogleFonts.spaceGrotesk(
+                style: GoogleFonts.inter(
                   fontSize: 12,
                   color: ApexColors.t2,
                   height: 1.5,

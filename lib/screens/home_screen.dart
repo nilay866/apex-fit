@@ -9,8 +9,9 @@ import '../widgets/apex_tag.dart';
 import '../widgets/apex_screen_header.dart';
 import '../widgets/apex_trend_chart.dart';
 import '../widgets/streak_calendar.dart';
-import '../services/supabase_service.dart';
 import '../services/ai_service.dart';
+import '../services/health_service.dart';
+import '../services/supabase_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final Map<String, dynamic>? profile;
@@ -29,6 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _waterLogs = [];
   List<Map<String, dynamic>> _bwLogs = [];
   List<Map<String, dynamic>> _photos = [];
+  int _steps = 0;
+  double _activeEnergy = 0.0;
   bool _loading = true;
   String _suggestion = '';
   bool _loadingSug = false;
@@ -69,6 +72,9 @@ class _HomeScreenState extends State<HomeScreen> {
       } catch (e) {
         waterError = SupabaseService.describeError(e);
       }
+      final healthData = await HealthService.fetchDailySummary();
+
+      if (!mounted) return;
       setState(() {
         _logs = results[0];
         _workouts = results[1];
@@ -77,6 +83,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _bwLogs = results[3];
         _photos = results[4];
         _waterError = waterError;
+        _steps = healthData['steps'] as int;
+        _activeEnergy = healthData['energy'] as double;
         _loading = false;
       });
       _loadSuggestion();
@@ -146,10 +154,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       setState(() => _waterError = message);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: ApexColors.red,
-        ),
+        SnackBar(content: Text(message), backgroundColor: ApexColors.red),
       );
     }
     if (mounted) {
@@ -192,9 +197,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final waterGoal = (widget.profile?['water_goal_ml'] as int?) ?? 2500;
     final latestBW = _bwLogs.isNotEmpty ? _bwLogs[0]['weight_kg'] : null;
     final hour = DateTime.now().hour;
-    final greet = hour < 12 ? 'Morning' : hour < 17 ? 'Afternoon' : 'Evening';
+    final greet = hour < 12
+        ? 'Morning'
+        : hour < 17
+        ? 'Afternoon'
+        : 'Evening';
     final firstName =
-        (widget.profile?['name'] ?? SupabaseService.currentUser?.email ?? 'Athlete')
+        (widget.profile?['name'] ??
+                SupabaseService.currentUser?.email ??
+                'Athlete')
             .toString()
             .split(' ')[0];
     final suggestedWorkout = _workouts.isNotEmpty ? _workouts.first : null;
@@ -215,16 +226,45 @@ class _HomeScreenState extends State<HomeScreen> {
           ApexScreenHeader(
             eyebrow: 'Dashboard',
             title: firstName,
-            subtitle: 'Good $greet. Your overview moves with your training week.',
+            subtitle:
+                'Good $greet. Your overview moves with your training week.',
             trailing: _streak > 0 ? _streakBadge() : null,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FutureBuilder<bool>(
+              future: HealthService.isSyncEnabled(),
+              builder: (context, snapshot) {
+                final enabled = snapshot.data ?? false;
+                if (enabled) {
+                  return ApexTag(
+                    text: 'Health sync active',
+                    color: ApexColors.t2,
+                  );
+                }
+                return InkWell(
+                  onTap: () async {
+                    final granted = await HealthService.requestPermissions();
+                    if (granted) _load();
+                  },
+                  borderRadius: BorderRadius.circular(99),
+                  child: ApexTag(
+                    text: 'Tap to sync steps & energy',
+                    color: ApexColors.accent,
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
           Wrap(
             spacing: 7,
             runSpacing: 7,
             children: [
               ApexTag(text: widget.profile?['goal'] ?? 'Build Muscle'),
-              if (latestBW != null) ApexTag(text: '${latestBW}kg', color: ApexColors.blue),
+              if (latestBW != null)
+                ApexTag(text: '${latestBW}kg', color: ApexColors.blue),
             ],
           ),
           const SizedBox(height: 14),
@@ -290,7 +330,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           Text(
                             'COACH NOTE',
-                            style: GoogleFonts.spaceGrotesk(
+                            style: GoogleFonts.inter(
                               fontSize: 10,
                               color: ApexColors.t3,
                               fontWeight: FontWeight.w700,
@@ -312,7 +352,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     const SizedBox(width: 7),
                                     Text(
                                       'Thinking through your next move...',
-                                      style: GoogleFonts.spaceGrotesk(
+                                      style: GoogleFonts.inter(
                                         color: ApexColors.t2,
                                         fontSize: 11,
                                       ),
@@ -323,7 +363,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   _suggestion.isNotEmpty
                                       ? _suggestion
                                       : 'Ready to train!',
-                                  style: GoogleFonts.spaceGrotesk(
+                                  style: GoogleFonts.inter(
                                     fontSize: 13,
                                     color: ApexColors.t1,
                                     height: 1.6,
@@ -365,7 +405,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Text(
                           '7-day momentum',
-                          style: GoogleFonts.spaceGrotesk(
+                          style: GoogleFonts.inter(
                             fontWeight: FontWeight.w800,
                             fontSize: 18,
                             color: ApexColors.t1,
@@ -374,7 +414,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(height: 4),
                         Text(
                           'Animated bar view of your recent training volume.',
-                          style: GoogleFonts.spaceGrotesk(
+                          style: GoogleFonts.inter(
                             fontSize: 12,
                             color: ApexColors.t2,
                           ),
@@ -386,11 +426,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Text(
                           '${weeklyVolume.fold<double>(0, (a, b) => a + b).round()}kg',
-                          style: ApexTheme.mono(size: 18, color: ApexColors.blue),
+                          style: ApexTheme.mono(
+                            size: 18,
+                            color: ApexColors.blue,
+                          ),
                         ),
                         Text(
                           'last 7 days',
-                          style: GoogleFonts.spaceGrotesk(
+                          style: GoogleFonts.inter(
                             fontSize: 10,
                             color: ApexColors.t3,
                             fontWeight: FontWeight.w700,
@@ -411,7 +454,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          Row(
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 12,
+            runSpacing: 12,
             children: [
               _miniStat(
                 Icons.stacked_bar_chart_rounded,
@@ -419,7 +465,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 'Sessions',
                 ApexColors.accentSoft,
               ),
-              const SizedBox(width: 8),
               _miniStat(
                 Icons.show_chart_rounded,
                 _loading
@@ -428,7 +473,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 'Volume',
                 ApexColors.blue,
               ),
-              const SizedBox(width: 8),
               _miniStat(
                 Icons.schedule_rounded,
                 _loading
@@ -437,12 +481,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 'Time',
                 ApexColors.purple,
               ),
+              _miniStat(
+                Icons.directions_walk_rounded,
+                _loading ? '—' : '${_steps}',
+                'Steps',
+                ApexColors.orange,
+              ),
+              _miniStat(
+                Icons.local_fire_department_rounded,
+                _loading ? '—' : '${_activeEnergy.toStringAsFixed(0)} kcal',
+                'Energy',
+                ApexColors.red,
+              ),
             ],
           ),
           const SizedBox(height: 14),
           Text(
             'Recent sessions',
-            style: GoogleFonts.spaceGrotesk(
+            style: GoogleFonts.inter(
               fontWeight: FontWeight.w700,
               fontSize: 18,
               color: ApexColors.t1,
@@ -499,13 +555,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: ApexColors.orange,
               ),
               const SizedBox(width: 6),
-              Text('$_streak', style: ApexTheme.mono(size: 16, color: ApexColors.t1)),
+              Text(
+                '$_streak',
+                style: ApexTheme.mono(size: 16, color: ApexColors.t1),
+              ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
             'DAY STREAK',
-            style: GoogleFonts.spaceGrotesk(
+            style: GoogleFonts.inter(
               fontSize: 8,
               color: ApexColors.t2,
               fontWeight: FontWeight.w700,
@@ -542,7 +601,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Text(
                       label.toUpperCase(),
-                      style: GoogleFonts.spaceGrotesk(
+                      style: GoogleFonts.inter(
                         fontSize: 10,
                         color: ApexColors.t3,
                         fontWeight: FontWeight.w700,
@@ -559,7 +618,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           TextSpan(
                             text: '/$goal $unit',
-                            style: ApexTheme.mono(size: 9, color: ApexColors.t3),
+                            style: ApexTheme.mono(
+                              size: 9,
+                              color: ApexColors.t3,
+                            ),
                           ),
                         ],
                       ),
@@ -617,7 +679,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Text(
                       'HYDRATION',
-                      style: GoogleFonts.spaceGrotesk(
+                      style: GoogleFonts.inter(
                         fontSize: 10,
                         color: ApexColors.t3,
                         fontWeight: FontWeight.w700,
@@ -629,12 +691,20 @@ class _HomeScreenState extends State<HomeScreen> {
                       text: TextSpan(
                         children: [
                           TextSpan(
-                            text: _loading ? '—' : (total / 1000).toStringAsFixed(1),
-                            style: ApexTheme.mono(size: 22, color: ApexColors.blue),
+                            text: _loading
+                                ? '—'
+                                : (total / 1000).toStringAsFixed(1),
+                            style: ApexTheme.mono(
+                              size: 22,
+                              color: ApexColors.blue,
+                            ),
                           ),
                           TextSpan(
                             text: '/${(goal / 1000).toStringAsFixed(1)}L',
-                            style: ApexTheme.mono(size: 9, color: ApexColors.t3),
+                            style: ApexTheme.mono(
+                              size: 9,
+                              color: ApexColors.t3,
+                            ),
                           ),
                         ],
                       ),
@@ -692,7 +762,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Text(
               'Log water intake',
-              style: GoogleFonts.spaceGrotesk(
+              style: GoogleFonts.inter(
                 fontWeight: FontWeight.w700,
                 fontSize: 16,
                 color: ApexColors.t1,
@@ -701,7 +771,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 4),
             Text(
               'Choose a quick amount and add it to today.',
-              style: GoogleFonts.spaceGrotesk(fontSize: 12, color: ApexColors.t2),
+              style: GoogleFonts.inter(fontSize: 12, color: ApexColors.t2),
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -793,7 +863,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Text(
                       'Journey frames',
-                      style: GoogleFonts.spaceGrotesk(
+                      style: GoogleFonts.inter(
                         fontWeight: FontWeight.w800,
                         fontSize: 18,
                         color: ApexColors.t1,
@@ -802,7 +872,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 4),
                     Text(
                       'Start, midpoint, and current photos in one responsive strip.',
-                      style: GoogleFonts.spaceGrotesk(
+                      style: GoogleFonts.inter(
                         fontSize: 12,
                         color: ApexColors.t2,
                       ),
@@ -847,7 +917,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     'Add progress photos to unlock your start, midpoint, and current comparison here.',
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.spaceGrotesk(
+                    style: GoogleFonts.inter(
                       fontSize: 12,
                       color: ApexColors.t2,
                       height: 1.55,
@@ -931,7 +1001,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(height: 8),
                             Text(
                               'Add photo',
-                              style: GoogleFonts.spaceGrotesk(
+                              style: GoogleFonts.inter(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
                                 color: ApexColors.t2,
@@ -951,7 +1021,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Text(
                   stage.label.toUpperCase(),
-                  style: GoogleFonts.spaceGrotesk(
+                  style: GoogleFonts.inter(
                     fontSize: 10,
                     color: ApexColors.t3,
                     fontWeight: FontWeight.w700,
@@ -966,7 +1036,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 4),
                 Text(
                   photoData == null ? 'Capture this milestone.' : dateLabel,
-                  style: GoogleFonts.spaceGrotesk(
+                  style: GoogleFonts.inter(
                     fontSize: 11,
                     color: ApexColors.t2,
                     height: 1.45,
@@ -1007,7 +1077,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Text(value, style: ApexTheme.mono(size: 15, color: color)),
             Text(
               label.toUpperCase(),
-              style: GoogleFonts.spaceGrotesk(
+              style: GoogleFonts.inter(
                 fontSize: 9,
                 color: ApexColors.t3,
                 fontWeight: FontWeight.w700,
@@ -1022,7 +1092,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _sessionCard(Map<String, dynamic> l) {
     final intensity = l['intensity'] ?? 'moderate';
-    final ic = {
+    final ic =
+        {
           'light': ApexColors.accentSoft,
           'moderate': ApexColors.blue,
           'heavy': ApexColors.orange,
@@ -1049,7 +1120,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     l['workout_name'] ?? 'Workout',
-                    style: GoogleFonts.spaceGrotesk(
+                    style: GoogleFonts.inter(
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
                       color: ApexColors.t1,
@@ -1079,9 +1150,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final map = <String, double>{};
     for (int i = days - 1; i >= 0; i--) {
       final d = DateTime.now().subtract(Duration(days: i));
-      map[
-        '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}'
-      ] = 0;
+      map['${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}'] =
+          0;
     }
     for (final l in logs) {
       final d = (l[dateField] as String?)?.split('T')[0];
@@ -1103,9 +1173,21 @@ class _HomeScreenState extends State<HomeScreen> {
     final stages = <_JourneyPhotoStage>[];
     if (_photos.isEmpty) {
       return const [
-        _JourneyPhotoStage(label: 'Start', dayLabel: 'Day 1', color: ApexColors.orange),
-        _JourneyPhotoStage(label: 'Midpoint', dayLabel: 'Halfway', color: ApexColors.blue),
-        _JourneyPhotoStage(label: 'Current', dayLabel: 'Today', color: ApexColors.accentSoft),
+        _JourneyPhotoStage(
+          label: 'Start',
+          dayLabel: 'Day 1',
+          color: ApexColors.orange,
+        ),
+        _JourneyPhotoStage(
+          label: 'Midpoint',
+          dayLabel: 'Halfway',
+          color: ApexColors.blue,
+        ),
+        _JourneyPhotoStage(
+          label: 'Current',
+          dayLabel: 'Today',
+          color: ApexColors.accentSoft,
+        ),
       ];
     }
 

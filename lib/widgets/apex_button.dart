@@ -111,7 +111,7 @@ class ApexButton extends StatelessWidget {
                     child: Text(
                       text,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.spaceGrotesk(
+                      style: GoogleFonts.inter(
                         fontWeight: FontWeight.w700,
                         fontSize: sm ? 12 : 14,
                         letterSpacing: isSoft || isOutline ? 0.0 : -0.2,
