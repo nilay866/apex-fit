@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../constants/colors.dart';
 import '../services/ai_service.dart';
+import '../services/plan_generator_service.dart';
+import '../services/supabase_service.dart';
 import '../widgets/apex_orb_logo.dart';
+import 'package:flutter/services.dart';
 
 class AiCoachScreen extends StatefulWidget {
   final Map<String, dynamic>? profile;
@@ -57,6 +60,8 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     _scrollBottom();
   }
 
+  bool _showPlanner = false;
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -67,24 +72,45 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
             color: ApexColors.surface.withAlpha(220),
             border: Border(bottom: BorderSide(color: ApexColors.border)),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const ApexOrbLogo(size: 54, label: 'AI', elevated: false),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Coach', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 20, color: ApexColors.t1)),
-                  const SizedBox(height: 4),
-                  Text('Context-aware training help for your current profile.', style: TextStyle(fontSize: 11, color: ApexColors.t2)),
-                ]),
+              Row(
+                children: [
+                  const ApexOrbLogo(size: 54, label: 'AI', elevated: false),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Coach', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 20, color: ApexColors.t1)),
+                      const SizedBox(height: 4),
+                      Text('Context-aware training help for your current profile.', style: TextStyle(fontSize: 11, color: ApexColors.t2)),
+                    ]),
+                  ),
+                ],
               ),
-              const SizedBox(width: 60),
+              const SizedBox(height: 16),
+              Container(
+                height: 36,
+                decoration: BoxDecoration(color: ApexColors.bg, borderRadius: BorderRadius.circular(8)),
+                child: Row(
+                  children: [
+                    _Tab('Chat', !_showPlanner, () => setState(() => _showPlanner = false)),
+                    _Tab('Macrocycle Planner', _showPlanner, () => setState(() => _showPlanner = true)),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
 
-        Expanded(
-          child: ListView.builder(
+        if (_showPlanner)
+          Expanded(child: const _MacrocyclePlannerTab())
+        else
+          Expanded(
+            child: Column(
+              children: [
+                Expanded(
+                  child: ListView.builder(
             controller: _scrollC,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             itemCount: _msgs.length + (_thinking ? 1 : 0),
@@ -185,8 +211,11 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
           ),
         ),
       ],
-    );
-  }
+    ),
+  ),
+],
+);
+}
 
   Widget _typingIndicator() {
     return Padding(
@@ -236,6 +265,174 @@ class _DotState extends State<_Dot> with SingleTickerProviderStateMixin {
         margin: const EdgeInsets.symmetric(horizontal: 2),
         decoration: BoxDecoration(color: ApexColors.t2.withAlpha((_c.value * 255).round()), shape: BoxShape.circle),
       ),
+    );
+  }
+}
+
+class _Tab extends StatelessWidget {
+  final String text;
+  final bool active;
+  final VoidCallback onTap;
+  const _Tab(this.text, this.active, this.onTap);
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            color: active ? ApexColors.surface : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: active ? [BoxShadow(color: Colors.black12, blurRadius: 4, offset: const Offset(0, 2))] : null,
+          ),
+          child: Center(
+            child: Text(text, style: GoogleFonts.inter(fontSize: 12, fontWeight: active ? FontWeight.w700 : FontWeight.w500, color: active ? ApexColors.t1 : ApexColors.t3)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MacrocyclePlannerTab extends StatefulWidget {
+  const _MacrocyclePlannerTab();
+  @override
+  State<_MacrocyclePlannerTab> createState() => _MacrocyclePlannerTabState();
+}
+
+class _MacrocyclePlannerTabState extends State<_MacrocyclePlannerTab> {
+  bool _loading = false;
+  Map<String, dynamic>? _macrocycle;
+
+  Future<void> _generate() async {
+    HapticFeedback.mediumImpact();
+    setState(() => _loading = true);
+    try {
+      final profile = SupabaseService.currentUser == null 
+          ? <String, dynamic>{} 
+          : (await SupabaseService.getProfile(SupabaseService.currentUser!.id)) ?? <String, dynamic>{};
+      
+      final plan = await PlanGeneratorService.generateMacrocycle(profile);
+      if (mounted) {
+        setState(() {
+          _macrocycle = plan;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_macrocycle == null) return _buildEmptyState();
+    return _buildMacrocycleView();
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: ApexColors.accent.withAlpha(20)),
+              child: const Icon(Icons.auto_awesome, size: 64, color: ApexColors.accent),
+            ),
+            const SizedBox(height: 24),
+            Text('AI Program Architect', style: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w800, color: ApexColors.t1)),
+            const SizedBox(height: 12),
+            Text(
+              'Generate a hyper-targeted 4-week macrocycle based on your goals, age, and fitness level using advanced kinesiology rules.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: ApexColors.t2, fontSize: 13, height: 1.5),
+            ),
+            const SizedBox(height: 32),
+            GestureDetector(
+              onTap: _loading ? null : _generate,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                decoration: BoxDecoration(color: _loading ? ApexColors.card : ApexColors.blue, borderRadius: BorderRadius.circular(16)),
+                child: Center(
+                  child: _loading
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: ApexColors.blue, strokeWidth: 2))
+                      : Text('Generate Macrocycle', style: GoogleFonts.inter(fontWeight: FontWeight.w700, color: ApexColors.bg)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMacrocycleView() {
+    final weeks = _macrocycle!.keys.where((k) => k.startsWith('week')).toList()..sort();
+    
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: weeks.length + 1,
+      itemBuilder: (context, i) {
+        if (i == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 24),
+            child: Text('Your 4-Week Block', style: GoogleFonts.inter(fontSize: 28, fontWeight: FontWeight.w900, color: ApexColors.t1)),
+          );
+        }
+        
+        final wKey = weeks[i - 1];
+        final wData = _macrocycle![wKey] as Map<String, dynamic>;
+        final focus = wData['focus'] ?? 'General Prep';
+        final days = wData['days'] as List<dynamic>? ?? [];
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 24),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(color: ApexColors.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: ApexColors.border)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${wKey.toUpperCase().replaceAll('_', ' ')}: $focus', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w800, color: ApexColors.accent)),
+              const SizedBox(height: 16),
+              ...days.map((day) {
+                final d = day as Map<String, dynamic>;
+                final intensity = d['intensity'] ?? 'Low';
+                final color = intensity == 'High' ? ApexColors.red : (intensity == 'Medium' || intensity == 'Med' ? ApexColors.yellow : ApexColors.blue);
+                
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 8, height: 8,
+                        margin: const EdgeInsets.only(top: 6, right: 12),
+                        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(d['title'] ?? 'Rest', style: TextStyle(color: ApexColors.t1, fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 4),
+                            Text(d['description'] ?? '', style: TextStyle(color: ApexColors.t3, fontSize: 12, height: 1.4)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ],
+          ),
+        );
+      },
     );
   }
 }

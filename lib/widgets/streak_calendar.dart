@@ -44,13 +44,13 @@ class StreakCalendar extends StatelessWidget {
       final hasWorkout = workoutDates.contains(key);
       final intensity = intensityMap[key];
 
-      if (isSunday) return ApexColors.surface;
       if (hasWorkout) {
-        if (intensity == 'heavy') return ApexColors.orange.withAlpha(58);
-        if (intensity == 'light') return ApexColors.accentDim;
-        return ApexColors.blue.withAlpha(54);
+        if (intensity == 'heavy') return ApexColors.orange.withAlpha(82);
+        if (intensity == 'light') return ApexColors.accentSoft.withAlpha(200);
+        return ApexColors.blue.withAlpha(82);
       }
-      if (isToday) return ApexColors.accentDim;
+      if (isToday) return ApexColors.t3.withAlpha(44);
+      if (isSunday) return Colors.transparent;
       if (date.isBefore(today)) return ApexColors.surface;
       return Colors.transparent;
     }
@@ -62,14 +62,22 @@ class StreakCalendar extends StatelessWidget {
       final hasWorkout = workoutDates.contains(key);
       final intensity = intensityMap[key];
 
-      if (isSunday) return ApexColors.border;
       if (hasWorkout) {
         if (intensity == 'heavy') return ApexColors.orange;
         if (intensity == 'light') return ApexColors.accentSoft;
         return ApexColors.blue;
       }
-      if (isToday) return ApexColors.accentSoft;
+      if (isToday) return ApexColors.t3;
+      if (isSunday || date.isAfter(today)) return ApexColors.border.withAlpha(60);
       return ApexColors.border.withAlpha(140);
+    }
+
+    Color textFor(DateTime date) {
+      final key = _key(date);
+      final hasWorkout = workoutDates.contains(key);
+      if (hasWorkout) return ApexColors.bg;
+      if (_isSameDay(date, today)) return ApexColors.t1;
+      return ApexColors.t3;
     }
 
     return ApexCard(
@@ -86,14 +94,14 @@ class StreakCalendar extends StatelessWidget {
                     Text(
                       'Training calendar',
                       style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                         fontSize: 18,
                         color: ApexColors.t1,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'A quick view of your last five training weeks.',
+                      'Your last five weeks.',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         color: ApexColors.t2,
@@ -104,7 +112,7 @@ class StreakCalendar extends StatelessWidget {
               ),
               _legend('Heavy', ApexColors.orange),
               const SizedBox(width: 8),
-              _legend('Moderate', ApexColors.blue),
+              _legend('Mod', ApexColors.blue),
               const SizedBox(width: 8),
               _legend('Light', ApexColors.accentSoft),
             ],
@@ -134,6 +142,7 @@ class StreakCalendar extends StatelessWidget {
               child: Row(
                 children: week.map((date) {
                   final isToday = _isSameDay(date, today);
+                  final isOutsideMonth = date.month != today.month;
                   return Expanded(
                     child: AspectRatio(
                       aspectRatio: 1,
@@ -143,42 +152,20 @@ class StreakCalendar extends StatelessWidget {
                           color: fillFor(date),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: borderFor(date)),
-                          boxShadow: isToday
-                              ? [
-                                  BoxShadow(
-                                    color: ApexColors.accentSoft.withAlpha(36),
-                                    blurRadius: 12,
-                                  ),
-                                ]
-                              : null,
                         ),
-                        child: isToday
-                            ? Center(
-                                child: Container(
-                                  width: 6,
-                                  height: 6,
-                                  decoration: const BoxDecoration(
-                                    color: ApexColors.accent,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              )
-                            : null,
+                        alignment: Alignment.center,
+                        child: Text(
+                          '${date.day}',
+                          style: GoogleFonts.dmMono(
+                            fontSize: 11,
+                            fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                            color: isOutsideMonth ? textFor(date).withAlpha(100) : textFor(date),
+                          ),
+                        ),
                       ),
                     ),
                   );
                 }).toList(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Center(
-            child: Text(
-              'Sundays stay clear for recovery.',
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                color: ApexColors.t3,
-                fontWeight: FontWeight.w600,
               ),
             ),
           ),

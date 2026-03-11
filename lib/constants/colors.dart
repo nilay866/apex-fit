@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 class ApexColors {
   static const Color bg = Color(0xFFF7F7F3);
   static const Color surface = Color(0xECFFFFFF);
+  static const Color surfaceStrong = Color(0xF3FFFFFF);
   static const Color card = Color(0xF8FFFFFF);
   static const Color cardAlt = Color(0xFFF1F4F7);
   static const Color border = Color(0x140F172A);

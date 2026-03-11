@@ -11,7 +11,7 @@ class AIService {
     );
   }
 
-  static Future<String> _generate(String prompt) async {
+  static Future<String> generate(String prompt) async {
     if (_model == null) throw Exception('AI is not configured for this build');
     try {
       final response = await _model!.generateContent([Content.text(prompt)]);
@@ -52,7 +52,7 @@ class AIService {
 Reply with ONLY valid JSON no markdown:
 {"name":"Workout Name","type":"Gym","exercises":[{"name":"Exercise","sets":3,"reps":"8-12","target_weight":"60"}]}
 Include 6 exercises. type must be one of: Gym, Calisthenics, HIIT, Mobility.''';
-    final raw = await _generate(prompt);
+    final raw = await generate(prompt);
     final parsed = _extractJson(raw);
     if (parsed['name'] == null || parsed['exercises'] == null) {
       throw Exception('Invalid AI response');
@@ -64,7 +64,7 @@ Include 6 exercises. type must be one of: Gym, Calisthenics, HIIT, Mobility.''';
     final prompt = '''Nutrition for "$food"${quantity != null && quantity.isNotEmpty ? " quantity $quantity" : ""}.
 Reply ONLY JSON no markdown: {"calories":250,"protein_g":20,"carbs_g":30,"fat_g":8}
 Realistic values, 100g default if no qty given.''';
-    final raw = await _generate(prompt);
+    final raw = await generate(prompt);
     return _extractJson(raw);
   }
 
@@ -77,7 +77,7 @@ Realistic values, 100g default if no qty given.''';
     final prompt = '''Athlete goal: $goal. Recent workouts: $recent. Today is $dayOfWeek.
 Suggest one workout in 1 sentence. Max 25 words. Name specific muscles.''';
     try {
-      final result = await _generate(prompt);
+      final result = await generate(prompt);
       return result.trim();
     } catch (_) {
       return 'Focus on compound lifts — squat, bench, or deadlift today.';
@@ -96,7 +96,7 @@ Suggest one workout in 1 sentence. Max 25 words. Name specific muscles.''';
     final system = '''You are an expert AI fitness coach in the APEX AI app. Be direct, specific, and motivating. Max 150 words unless asked more. Bullet points for lists.
 Athlete: $athleteName | Goal: $goal | Weight: ${weightKg ?? '?'}kg | Height: ${heightCm ?? '?'}cm
 Recent: ${recentLogs.isNotEmpty ? recentLogs.join(', ') : 'none'}''';
-    return await _generate('$system\n\n---\n$history\nCoach:');
+    return await generate('$system\n\n---\n$history\nCoach:');
   }
 
   static Future<bool> testConnection(String apiKey) async {

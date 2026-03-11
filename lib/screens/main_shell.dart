@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:haptic_feedback/haptic_feedback.dart';
 import '../constants/colors.dart';
 import '../services/supabase_service.dart';
 import '../widgets/apex_backdrop.dart';
 import '../widgets/apex_orb_logo.dart';
 import '../widgets/profile_modal.dart';
 import 'active_workout_screen.dart';
-import 'ai_coach_screen.dart';
 import 'home_screen.dart';
 import 'nutrition_screen.dart';
+import 'social_feed_screen.dart';
 import 'photos_screen.dart';
 import 'reports_screen.dart';
 import 'workout_screen.dart';
-
+import 'circuit_player_screen.dart';
+import 'cardio_map_screen.dart';
 class MainShell extends StatefulWidget {
   final VoidCallback onSignOut;
 
@@ -30,10 +33,10 @@ class _MainShellState extends State<MainShell> {
   static const _navItems = [
     {'icon': Icons.home_rounded, 'label': 'Home'},
     {'icon': Icons.fitness_center_rounded, 'label': 'Train'},
+    {'icon': Icons.public_rounded, 'label': 'Social'},
     {'icon': Icons.restaurant_menu_rounded, 'label': 'Fuel'},
     {'icon': Icons.photo_camera_back_rounded, 'label': 'Photos'},
     {'icon': Icons.bar_chart_rounded, 'label': 'Stats'},
-    {'icon': Icons.auto_awesome_rounded, 'label': 'Coach'},
   ];
 
   @override
@@ -41,6 +44,14 @@ class _MainShellState extends State<MainShell> {
     super.initState();
     _loadProfile();
     _loadRecentLogs();
+    _syncOfflineData();
+  }
+
+  Future<void> _syncOfflineData() async {
+    // Fire and forget sync
+    SupabaseService.syncOfflineWorkouts().then((_) {
+      if (mounted) _loadRecentLogs(); // Refresh logs if sync succeeded
+    });
   }
 
   Future<void> _loadProfile() async {
@@ -71,12 +82,13 @@ class _MainShellState extends State<MainShell> {
   void _finishWorkout() {
     setState(() {
       _activeWorkout = null;
-      _tab = 4;
+      _tab = 4; // Switch to Stats after workout
     });
     _loadRecentLogs();
   }
 
   void _showProfile() {
+    Haptics.vibrate(HapticsType.light);
     Navigator.of(context)
         .push<void>(
           PageRouteBuilder<void>(
@@ -117,6 +129,12 @@ class _MainShellState extends State<MainShell> {
   @override
   Widget build(BuildContext context) {
     if (_activeWorkout != null) {
+      final t = _activeWorkout!['type']?.toString().toLowerCase() ?? '';
+      if (t == 'hiit' || t == 'circuit') {
+        return CircuitPlayerScreen(workout: _activeWorkout!, onFinish: _finishWorkout);
+      } else if (t == 'cardio' || t == 'run') {
+        return CardioMapScreen(workout: _activeWorkout!, onFinish: _finishWorkout);
+      }
       return ActiveWorkoutScreen(workout: _activeWorkout!, onFinish: _finishWorkout);
     }
 
@@ -134,10 +152,10 @@ class _MainShellState extends State<MainShell> {
                   children: [
                     HomeScreen(profile: _profile, onStartWorkout: _startWorkout),
                     WorkoutScreen(onStartWorkout: _startWorkout),
+                    const SocialFeedScreen(),
                     const NutritionScreen(),
                     const PhotosScreen(),
                     const ReportsScreen(),
-                    AiCoachScreen(profile: _profile, recentLogs: _recentLogs),
                   ],
                 ),
               ),
@@ -158,16 +176,16 @@ class _MainShellState extends State<MainShell> {
         ),
       ),
       bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         child: Container(
-          height: 76,
+          height: 72,
           decoration: BoxDecoration(
             color: ApexColors.surface.withAlpha(235),
             borderRadius: BorderRadius.circular(28),
             border: Border.all(color: ApexColors.borderStrong),
             boxShadow: [
               BoxShadow(
-                color: ApexColors.shadow.withAlpha(64),
+                color: ApexColors.shadow.withAlpha(54),
                 blurRadius: 26,
                 offset: const Offset(0, 14),
               ),
@@ -181,7 +199,12 @@ class _MainShellState extends State<MainShell> {
 
               return Expanded(
                 child: GestureDetector(
-                  onTap: () => setState(() => _tab = index),
+                  onTap: () {
+                    if (_tab != index) {
+                      Haptics.vibrate(HapticsType.selection);
+                      setState(() => _tab = index);
+                    }
+                  },
                   behavior: HitTestBehavior.opaque,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
@@ -202,6 +225,7 @@ class _MainShellState extends State<MainShell> {
                           style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                 color: color,
                                 letterSpacing: 0.7,
+                                fontWeight: active ? FontWeight.bold : FontWeight.normal,
                               ),
                         ),
                         const SizedBox(height: 5),

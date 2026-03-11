@@ -8,7 +8,9 @@ import '../widgets/apex_card.dart';
 import '../widgets/apex_screen_header.dart';
 import '../widgets/apex_trend_chart.dart';
 import '../widgets/macro_bar.dart';
+import '../widgets/heatmaps_painter.dart';
 import '../services/supabase_service.dart';
+import '../services/plan_generator_service.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -27,11 +29,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
   final _bwC = TextEditingController();
   bool _savingBw = false;
   String? _waterError;
+  bool _show1RM = false;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _bwC.addListener(() {
+      if (mounted) setState(() {});
+    });
   }
 
   int get _days => {'day': 1, 'week': 7, 'month': 30, 'year': 365}[_period] ?? 7;
@@ -71,13 +77,30 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final w = double.tryParse(_bwC.text);
     if (w == null) return;
     setState(() => _savingBw = true);
-    await SupabaseService.createBodyWeightLog(SupabaseService.currentUser!.id, w);
-    final bw = await SupabaseService.getBodyWeightLogs(SupabaseService.currentUser!.id);
-    setState(() {
-      _bwLogs = bw;
-      _savingBw = false;
-    });
-    _bwC.clear();
+    
+    try {
+      await SupabaseService.createBodyWeightLog(SupabaseService.currentUser!.id, w);
+      final bw = await SupabaseService.getBodyWeightLogs(SupabaseService.currentUser!.id);
+      if (mounted) {
+        setState(() {
+          _bwLogs = bw;
+        });
+        _bwC.clear();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(SupabaseService.describeError(e)),
+            backgroundColor: ApexColors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _savingBw = false);
+      }
+    }
   }
 
   @override
@@ -147,30 +170,32 @@ class _ReportsScreenState extends State<ReportsScreen> {
             subtitle: 'Achievements, graphs, and daily signals that feel more like a game board.',
           ),
           const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: ApexColors.surface,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: ApexColors.borderStrong),
-              boxShadow: [
-                BoxShadow(
-                  color: ApexColors.shadow.withAlpha(22),
-                  blurRadius: 18,
-                  offset: const Offset(0, 10),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _show1RM = false),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(color: !_show1RM ? ApexColors.accent : ApexColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: ApexColors.border)),
+                    child: Center(child: Text('Dashboard', style: TextStyle(color: !_show1RM ? ApexColors.bg : ApexColors.t2, fontWeight: FontWeight.w700))),
+                  ),
                 ),
-              ],
-            ),
-            child: Row(
-              children: [
-                _periodTab('day', 'Today'),
-                _periodTab('week', 'Week'),
-                _periodTab('month', 'Month'),
-                _periodTab('year', 'Year'),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => setState(() => _show1RM = true),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(color: _show1RM ? ApexColors.purple : ApexColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: ApexColors.border)),
+                    child: Center(child: Text('1RM Extrapolation', style: TextStyle(color: _show1RM ? ApexColors.bg : ApexColors.t2, fontWeight: FontWeight.w700))),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 24),
           if (_loading)
             const Center(
               child: Padding(
@@ -178,17 +203,55 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 child: CircularProgressIndicator(color: ApexColors.accent),
               ),
             )
+          else if (_show1RM)
+            _build1RMDashboard()
           else ...[
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _summaryCard(Icons.fitness_center_rounded, '${_wLogs.length} sessions', 'Workouts', ApexColors.accentSoft),
-                _summaryCard(Icons.stacked_bar_chart_rounded, '${totalVol}kg', 'Volume', ApexColors.blue),
-                _summaryCard(Icons.restaurant_menu_rounded, '${_nLogs.length} meals', 'Meals', ApexColors.orange),
-                _summaryCard(Icons.water_drop_rounded, '${(avgWater / 1000).toStringAsFixed(1)}L', 'Hydration', ApexColors.cyan),
-              ],
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: ApexColors.surface,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: ApexColors.borderStrong),
+                boxShadow: [
+                  BoxShadow(color: ApexColors.shadow.withAlpha(22), blurRadius: 18, offset: const Offset(0, 10)),
+                ],
+              ),
+              child: Row(
+                children: [
+                  _periodTab('day', 'Today'),
+                  _periodTab('week', 'Week'),
+                  _periodTab('month', 'Month'),
+                  _periodTab('year', 'Year'),
+                ],
+              ),
             ),
+            const SizedBox(height: 24),
+            const SizedBox(height: 24),
+            ApexCard(
+              glow: true,
+              glowColor: ApexColors.accent,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Habit Dashboard', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18, color: ApexColors.t1)),
+                  const SizedBox(height: 4),
+                  Text('Daily unified radial tracking goals.', style: TextStyle(fontSize: 12, color: ApexColors.t2)),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildRing('Water\n${(avgWater/1000).toStringAsFixed(1)}L', (avgWater / 3000).clamp(0.0, 1.0), ApexColors.cyan),
+                      _buildRing('Protein\n${_avgMacro('protein_g')}g', (_avgMacro('protein_g') / 160).clamp(0.0, 1.0), ApexColors.blue),
+                      _buildRing('Workouts\n${_wLogs.length}', (_wLogs.length / (_days / 2)).clamp(0.0, 1.0), ApexColors.accentSoft),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildHeatmapCard(),
+            const SizedBox(height: 12),
+            _buildContributionGraph(),
             const SizedBox(height: 12),
             _achievementHub(achievements),
             const SizedBox(height: 12),
@@ -297,28 +360,32 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Body weight graph',
-                            style: GoogleFonts.inter(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 18,
-                              color: ApexColors.t1,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Body weight graph',
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 18,
+                                color: ApexColors.t1,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Smooth line for weight movement with quick logging.',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: ApexColors.t2,
+                            const SizedBox(height: 4),
+                            Text(
+                              'Smooth line for weight movement with quick logging.',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: ApexColors.t2,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           SizedBox(
                             width: 68,
@@ -761,6 +828,247 @@ class _ReportsScreenState extends State<ReportsScreen> {
         const SizedBox(height: 1),
         Text(value, style: ApexTheme.mono(size: 14, color: color)),
       ],
+    );
+  }
+
+  Widget _build1RMDashboard() {
+    final Map<String, double> top1RM = {};
+    final Map<String, List<double>> history1RM = {};
+    
+    // Parse sequentially chronologically (reversed from wLogs which is newest first)
+    for (final w in _wLogs.reversed) {
+      final exs = (w['exercises'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+      for (final ex in exs) {
+        final name = ex['name']?.toString() ?? 'Unknown';
+        final sets = (ex['sets'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        double sessionMax = 0;
+        for (final s in sets) {
+          if (s['done'] == true) {
+            final weight = double.tryParse(s['weight'].toString()) ?? 0.0;
+            final reps = int.tryParse(s['reps'].toString()) ?? 0;
+            if (weight > 0 && reps > 0) {
+              final rm = SmartCoach.estimate1RM(weight, reps);
+              if (!top1RM.containsKey(name) || rm > top1RM[name]!) {
+                top1RM[name] = rm;
+              }
+              if (rm > sessionMax) sessionMax = rm;
+            }
+          }
+        }
+        if (sessionMax > 0) {
+          history1RM.putIfAbsent(name, () => []).add(sessionMax);
+        }
+      }
+    }
+
+    if (top1RM.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 32),
+          child: Column(
+            children: [
+              const Icon(Icons.calculate, size: 64, color: ApexColors.accentSoft),
+              const SizedBox(height: 16),
+              Text('No 1RM Data', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: ApexColors.t1)),
+              const SizedBox(height: 8),
+              Text('Log at least one completed set with weight and reps to generate extrapolation tables.', textAlign: TextAlign.center, style: TextStyle(color: ApexColors.t2, height: 1.5)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final entries = top1RM.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+
+    return Column(
+      children: entries.map((e) {
+        final name = e.key;
+        final rm = e.value;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 24),
+          child: ApexCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(child: Text(name, style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18, color: ApexColors.t1))),
+                    Text('${rm.round()} kg', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 18, color: ApexColors.accent)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text('Estimated 1 Rep Max', style: TextStyle(fontSize: 12, color: ApexColors.t3)),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8, runSpacing: 8,
+                  children: [100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50].map((pct) {
+                    final w = SmartCoach.prescribedWeight(rm, pct / 100);
+                    final isTop = pct >= 90;
+                    return Container(
+                      width: 72,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(color: ApexColors.bg, borderRadius: BorderRadius.circular(8), border: Border.all(color: isTop ? ApexColors.red.withAlpha(50) : ApexColors.border)),
+                      child: Column(
+                        children: [
+                          Text('$pct%', style: GoogleFonts.inter(fontSize: 11, color: isTop ? ApexColors.red : ApexColors.t3, fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 4),
+                          Text('${w.round()}', style: GoogleFonts.inter(fontSize: 16, color: ApexColors.t1, fontWeight: FontWeight.w800)),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+                if (history1RM.containsKey(name) && history1RM[name]!.length > 1) ...[
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('1RM Progression trajectory', style: TextStyle(fontSize: 12, color: ApexColors.t2, fontWeight: FontWeight.w700)),
+                      Text('${history1RM[name]!.length} sessions', style: TextStyle(fontSize: 10, color: ApexColors.t3)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  ApexLineTrendChart(
+                    values: history1RM[name]!,
+                    color: ApexColors.accentSoft,
+                    height: 100,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildRing(String label, double progress, Color color) {
+    return Column(
+      children: [
+        SizedBox(
+          width: 72, height: 72,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              CircularProgressIndicator(value: 1.0, strokeWidth: 8, color: color.withAlpha(25)),
+              CircularProgressIndicator(value: progress, strokeWidth: 8, color: color, strokeCap: StrokeCap.round),
+              Center(
+                child: Text(
+                  '${(progress * 100).round()}%',
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13, color: ApexColors.t1),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: ApexColors.t2, height: 1.4, fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+
+  Widget _buildHeatmapCard() {
+    final Map<String, double> intensities = {'Head': 0, 'Shoulders': 0, 'Chest': 0, 'Core': 0, 'Arms': 0, 'Legs': 0};
+    for (var w in _wLogs) {
+      final n = w['name'].toString().toLowerCase();
+      if (n.contains('push') || n.contains('chest')) intensities['Chest'] = (intensities['Chest']! + 0.2).clamp(0.0, 1.0);
+      if (n.contains('pull') || n.contains('back')) intensities['Arms'] = (intensities['Arms']! + 0.2).clamp(0.0, 1.0);
+      if (n.contains('leg') || n.contains('squat')) intensities['Legs'] = (intensities['Legs']! + 0.3).clamp(0.0, 1.0);
+      if (n.contains('core') || n.contains('abs') || n.contains('hiit')) intensities['Core'] = (intensities['Core']! + 0.25).clamp(0.0, 1.0);
+      if (n.contains('shoulder')) intensities['Shoulders'] = (intensities['Shoulders']! + 0.3).clamp(0.0, 1.0);
+    }
+
+    return ApexCard(
+      glow: true,
+      glowColor: ApexColors.red,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Volume Heatmap', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18, color: ApexColors.t1)),
+                  const SizedBox(height: 4),
+                  Text('3D anatomical distribution', style: TextStyle(fontSize: 12, color: ApexColors.t2)),
+                ],
+              ),
+              const Icon(Icons.accessibility_new_rounded, color: ApexColors.t3),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Center(
+            child: SizedBox(
+              width: 140,
+              height: 200,
+              child: CustomPaint(
+                painter: AnatomyHeatmapPainter(intensity: intensities),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContributionGraph() {
+    final now = DateTime.now();
+    final days = List.generate(84, (i) => now.subtract(Duration(days: 83 - i)));
+    
+    final Set<String> activeDates = _wLogs.map((w) {
+      final iso = w['completed_at']?.toString();
+      if (iso == null) return '';
+      return iso.split('T')[0];
+    }).toSet();
+
+    return ApexCard(
+      glow: true,
+      glowColor: ApexColors.accent,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Contribution Heatmap', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18, color: ApexColors.t1)),
+              Text('${activeDates.length} days active', style: GoogleFonts.inter(fontSize: 12, color: ApexColors.accent, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text('Consistency over the last 12 weeks', style: TextStyle(fontSize: 12, color: ApexColors.t2)),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 110,
+            child: GridView.builder(
+              reverse: false,
+              padding: EdgeInsets.zero,
+              scrollDirection: Axis.horizontal,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7, 
+                mainAxisSpacing: 6, 
+                crossAxisSpacing: 6,
+              ),
+              itemCount: days.length,
+              itemBuilder: (ctx, i) {
+                final d = days[i];
+                final ds = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+                final active = activeDates.contains(ds);
+                return Container(
+                  decoration: BoxDecoration(
+                    color: active ? ApexColors.accent : ApexColors.surface,
+                    borderRadius: BorderRadius.circular(3),
+                    border: active ? null : Border.all(color: ApexColors.border),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 

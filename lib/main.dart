@@ -53,6 +53,8 @@ class _ApexAIAppState extends State<ApexAIApp> {
 
       if (SupabaseService.currentUser != null) {
         setState(() => _state = AppState.home);
+        // Fire and forget sync mechanism
+        SupabaseService.syncOfflineWorkouts();
       } else {
         setState(() => _state = AppState.auth);
       }

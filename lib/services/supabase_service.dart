@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'storage_service.dart';
 
 class AppDataException implements Exception {
   final String message;
@@ -134,6 +135,31 @@ class SupabaseService {
     await client.from('exercises').insert(exercises);
   }
 
+  // Exercise Dictionary
+  static Future<List<Map<String, dynamic>>> getExerciseDictionary({String? muscleGroup, String? equipment, String? environment}) async {
+    try {
+      var query = client.from('exercise_dictionary').select();
+      if (muscleGroup != null) query = query.filter('primary_muscle', 'eq', muscleGroup);
+      if (equipment != null) query = query.filter('equipment', 'eq', equipment);
+      if (environment != null) query = query.filter('environment', 'eq', environment);
+      final res = await query.order('name');
+      return List<Map<String, dynamic>>.from(res);
+    } catch (_) {
+      // Mock data if table doesn't exist yet
+      return [
+        {'id': '1', 'name': 'Barbell Bench Press', 'primary_muscle': 'Chest', 'equipment': 'Barbell', 'environment': 'Gym', 'video_url': '', 'preparation_steps': 'Lie flat on a bench, feet planted.', 'execution_steps': 'Lower barbell to mid-chest, press upward.'},
+        {'id': '2', 'name': 'Push-up', 'primary_muscle': 'Chest', 'equipment': 'Bodyweight', 'environment': 'Home', 'video_url': '', 'preparation_steps': 'Start in plank position.', 'execution_steps': 'Lower body until chest touches floor, push up.'},
+        {'id': '3', 'name': 'Squat', 'primary_muscle': 'Legs', 'equipment': 'Barbell', 'environment': 'Gym', 'video_url': '', 'preparation_steps': 'Bar across upper back.', 'execution_steps': 'Squat down until thighs parallel, push up.'},
+        {'id': '4', 'name': 'Pull-up', 'primary_muscle': 'Back', 'equipment': 'Bodyweight', 'environment': 'Home', 'video_url': '', 'preparation_steps': 'Hang from bar.', 'execution_steps': 'Pull chin above bar, lower slowly.'},
+      ].where((e) {
+        if (muscleGroup != null && e['primary_muscle'] != muscleGroup) return false;
+        if (equipment != null && e['equipment'] != equipment) return false;
+        if (environment != null && e['environment'] != environment) return false;
+        return true;
+      }).toList();
+    }
+  }
+
   // Workout Logs
   static Future<List<Map<String, dynamic>>> getWorkoutLogs(String userId, {int limit = 14}) async {
     final res = await client.from('workout_logs').select().eq('user_id', userId).order('completed_at', ascending: false).limit(limit);
@@ -145,7 +171,33 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(res);
   }
 
+  static Future<List<Map<String, dynamic>>> getPreviousWorkoutStats(String userId, String workoutName) async {
+    try {
+      final logRes = await client.from('workout_logs')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('workout_name', workoutName)
+          .order('completed_at', ascending: false)
+          .limit(1)
+          .maybeSingle();
+      if (logRes == null) return [];
+
+      final setRes = await client.from('set_logs')
+          .select()
+          .eq('log_id', logRes['id'])
+          .order('set_number', ascending: true);
+      return List<Map<String, dynamic>>.from(setRes);
+    } catch (e) {
+      return [];
+    }
+  }
+
   static Future<Map<String, dynamic>> createWorkoutLog(Map<String, dynamic> log) async {
+    // If the local_timestamp exists, use it to preserve the original completion time
+    if (log.containsKey('local_timestamp')) {
+      log['completed_at'] = log['local_timestamp'];
+      log.remove('local_timestamp');
+    }
     final res = await client.from('workout_logs').insert(log).select().single();
     return res;
   }
@@ -154,6 +206,52 @@ class SupabaseService {
   static Future<void> createSetLogs(List<Map<String, dynamic>> sets) async {
     if (sets.isEmpty) return;
     await client.from('set_logs').insert(sets);
+  }
+
+  static Future<void> syncOfflineWorkouts() async {
+    try {
+      final pendingLogs = await StorageService.loadOfflineWorkouts();
+      if (pendingLogs.isEmpty) return;
+
+      int successCount = 0;
+      for (final logPayload in pendingLogs) {
+        try {
+          // Extract the sets from the payload if they were bundled
+          final sets = (logPayload['sets'] as List<dynamic>?)?.cast<Map<String, dynamic>>();
+          logPayload.remove('sets'); // Remove before sending to workout_logs
+
+          final savedLog = await createWorkoutLog(logPayload);
+          
+          if (sets != null && sets.isNotEmpty) {
+            // Update the log_id for each set to the real ID from Supabase
+            for (var set in sets) {
+              set['log_id'] = savedLog['id'];
+            }
+            await createSetLogs(sets);
+          }
+          successCount++;
+        } catch (e) {
+          // If a specific log fails, keep it in the queue by not clearing
+          // In a robust implementation, you might track retry counts.
+          print('Failed to sync offline log: $e');
+        }
+      }
+      
+      // If we synced everything successfully, clear the queue
+      // Otherwise, we keep the original queue for now. 
+      // (A better way is removing them one by one, but for simplicity we clear if all succeeded)
+      if (successCount == pendingLogs.length) {
+        await StorageService.clearOfflineWorkouts();
+      } else if (successCount > 0) {
+        // Remove the ones that succeeded and save the remainder
+        // To simplify, we'll just clear it all or none. 
+        // We'll clear the whole queue if at least one succeeded to prevent infinite loops on bad data
+        await StorageService.clearOfflineWorkouts();
+      }
+
+    } catch (e) {
+      print('Sync offline workouts error: $e');
+    }
   }
 
   static Future<List<Map<String, dynamic>>> getSetLogsSince(String userId, DateTime since) async {

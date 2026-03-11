@@ -23,6 +23,8 @@ class _AuthScreenState extends State<AuthScreen> {
   final _emailC = TextEditingController();
   final _pwC = TextEditingController();
   String _goal = 'Build Muscle';
+  int _age = 25;
+  int _level = 5;
   bool _loading = false;
   String _err = '';
   String _info = '';
@@ -70,6 +72,8 @@ class _AuthScreenState extends State<AuthScreen> {
             await SupabaseService.updateProfile(res.user!.id, {
               'goal': _goal,
               'name': _nameC.text.trim(),
+              'age': _age,
+              'fitness_level': _level,
             });
           } catch (_) {}
           if (res.session != null) {
@@ -229,34 +233,69 @@ class _AuthScreenState extends State<AuthScreen> {
                             const SizedBox(height: 16),
                             _fieldLabel('Primary goal'),
                             const SizedBox(height: 10),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: _goals.map((goal) {
-                                final selected = _goal == goal;
-                                return GestureDetector(
-                                  onTap: () => setState(() => _goal = goal),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 180),
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                                    decoration: BoxDecoration(
-                                      color: selected ? ApexColors.accentDim : ApexColors.surface,
-                                      borderRadius: BorderRadius.circular(18),
-                                      border: Border.all(
-                                        color: selected ? ApexColors.accentSoft : ApexColors.border,
+                            SizedBox(
+                              height: 100,
+                              child: ListView(
+                                scrollDirection: Axis.horizontal,
+                                children: _goals.map((goal) {
+                                  final selected = _goal == goal;
+                                  return GestureDetector(
+                                    onTap: () => setState(() => _goal = goal),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 180),
+                                      margin: const EdgeInsets.only(right: 12),
+                                      padding: const EdgeInsets.all(16),
+                                      width: 110,
+                                      decoration: BoxDecoration(
+                                        color: selected ? ApexColors.accentDim : ApexColors.surface,
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: selected ? ApexColors.accent : ApexColors.border,
+                                          width: selected ? 2 : 1,
+                                        ),
+                                      ),
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.flag_circle, size: 28, color: selected ? ApexColors.accent : ApexColors.t3),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            goal,
+                                            textAlign: TextAlign.center,
+                                            style: GoogleFonts.inter(
+                                              color: selected ? ApexColors.t1 : ApexColors.t2,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                    child: Text(
-                                      goal,
-                                      style: GoogleFonts.inter(
-                                        color: selected ? ApexColors.t1 : ApexColors.t2,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            _fieldLabel('Age ($_age)'),
+                            Slider(
+                              value: _age.toDouble(),
+                              min: 16,
+                              max: 80,
+                              divisions: 64,
+                              activeColor: ApexColors.accent,
+                              inactiveColor: ApexColors.borderStrong,
+                              onChanged: (v) => setState(() => _age = v.toInt()),
+                            ),
+                            const SizedBox(height: 16),
+                            _fieldLabel('Fitness Level ($_level/10)'),
+                            Slider(
+                              value: _level.toDouble(),
+                              min: 1,
+                              max: 10,
+                              divisions: 9,
+                              activeColor: ApexColors.accent,
+                              inactiveColor: ApexColors.borderStrong,
+                              onChanged: (v) => setState(() => _level = v.toInt()),
                             ),
                           ],
                           const SizedBox(height: 18),

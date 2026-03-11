@@ -269,6 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 14),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: _statCard(
@@ -591,9 +592,10 @@ class _HomeScreenState extends State<HomeScreen> {
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Column(
@@ -641,20 +643,25 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(99),
-            child: LinearProgressIndicator(
-              value: pct,
-              minHeight: 7,
-              backgroundColor: ApexColors.cardAlt,
-              valueColor: AlwaysStoppedAnimation(color),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '${(pct * 100).round()}% of goal',
-            style: const TextStyle(fontSize: 10, color: ApexColors.t3),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(99),
+                child: LinearProgressIndicator(
+                  value: pct,
+                  minHeight: 7,
+                  backgroundColor: ApexColors.cardAlt,
+                  valueColor: AlwaysStoppedAnimation(color),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${(pct * 100).round()}% of goal',
+                style: const TextStyle(fontSize: 10, color: ApexColors.t3),
+              ),
+            ],
           ),
         ],
       ),
@@ -663,92 +670,96 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _waterCard(int total, int goal) {
     final pct = goal > 0 ? (total / goal).clamp(0.0, 1.0) : 0.0;
-    return ApexCard(
-      glow: true,
-      glowColor: ApexColors.blue,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'HYDRATION',
-                      style: GoogleFonts.inter(
-                        fontSize: 10,
-                        color: ApexColors.t3,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
+    return GestureDetector(
+      onTap: () => setState(() => _addWater = true),
+      child: ApexCard(
+        glow: true,
+        glowColor: ApexColors.blue,
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'HYDRATION',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          color: ApexColors.t3,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    RichText(
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: _loading
-                                ? '—'
-                                : (total / 1000).toStringAsFixed(1),
-                            style: ApexTheme.mono(
-                              size: 22,
-                              color: ApexColors.blue,
+                      const SizedBox(height: 4),
+                      RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(
+                              text: _loading
+                                  ? '—'
+                                  : (total / 1000).toStringAsFixed(1),
+                              style: ApexTheme.mono(
+                                size: 22,
+                                color: ApexColors.blue,
+                              ),
                             ),
-                          ),
-                          TextSpan(
-                            text: '/${(goal / 1000).toStringAsFixed(1)}L',
-                            style: ApexTheme.mono(
-                              size: 9,
-                              color: ApexColors.t3,
+                            TextSpan(
+                              text: '/${(goal / 1000).toStringAsFixed(1)}L',
+                              style: ApexTheme.mono(
+                                size: 9,
+                                color: ApexColors.t3,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: ApexColors.blue.withAlpha(18),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: ApexColors.blue.withAlpha(60)),
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: ApexColors.blue.withAlpha(18),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: ApexColors.blue.withAlpha(60)),
+                  ),
+                  child: const Icon(
+                    Icons.water_drop_rounded,
+                    size: 20,
+                    color: ApexColors.blue,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.water_drop_rounded,
-                  size: 20,
-                  color: ApexColors.blue,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(99),
-            child: LinearProgressIndicator(
-              value: pct,
-              minHeight: 7,
-              backgroundColor: ApexColors.cardAlt,
-              valueColor: const AlwaysStoppedAnimation(ApexColors.blue),
+              ],
             ),
-          ),
-          const SizedBox(height: 10),
-          ApexButton(
-            text: 'Log water',
-            onPressed: () => setState(() => _addWater = true),
-            icon: Icons.add_rounded,
-            tone: ApexButtonTone.soft,
-            color: ApexColors.blue,
-            sm: true,
-            full: true,
-          ),
-        ],
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: LinearProgressIndicator(
+                    value: pct,
+                    minHeight: 7,
+                    backgroundColor: ApexColors.cardAlt,
+                    valueColor: const AlwaysStoppedAnimation(ApexColors.blue),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Tap to track',
+                  style: GoogleFonts.inter(fontSize: 10, color: ApexColors.blue, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -954,40 +965,22 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       width: 152,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [ApexColors.card, ApexColors.cardAlt],
-        ),
+        color: ApexColors.surfaceStrong,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: stage.color.withAlpha(54)),
-        boxShadow: [
-          BoxShadow(
-            color: stage.color.withAlpha(16),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
+        border: Border.all(color: ApexColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(23)),
             child: SizedBox(
               height: 172,
               width: double.infinity,
               child: photoData == null
                   ? DecoratedBox(
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            stage.color.withAlpha(20),
-                            ApexColors.cardAlt,
-                          ],
-                        ),
+                        color: stage.color.withAlpha(12),
                       ),
                       child: Center(
                         child: Column(
@@ -1067,7 +1060,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _miniStat(IconData icon, String value, String label, Color color) {
-    return Expanded(
+    return SizedBox(
+      width: (MediaQuery.of(context).size.width - 60) / 3,
       child: ApexCard(
         padding: const EdgeInsets.all(11),
         child: Column(

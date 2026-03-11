@@ -1,15 +1,15 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui';
+import 'package:flutter/services.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:haptic_feedback/haptic_feedback.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/supabase_service.dart';
 import '../widgets/apex_button.dart';
 import '../widgets/apex_orb_logo.dart';
-
-enum ProfileTab { profile, goals, account }
 
 @Deprecated('Use ProfileScreen instead.')
 class ProfileModal extends StatelessWidget {
@@ -58,7 +58,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _waterGoalC;
   late String _goal;
   String? _avatarData;
-  ProfileTab _activeTab = ProfileTab.profile;
   bool _loading = false;
   bool _saved = false;
 
@@ -94,6 +93,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _pickAvatar(ImageSource source, BuildContext sheetContext) async {
     Navigator.pop(sheetContext);
+    Haptics.vibrate(HapticsType.light);
     final picker = ImagePicker();
     try {
       final file = await picker.pickImage(
@@ -129,90 +129,97 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _showAvatarOptions() async {
+    Haptics.vibrate(HapticsType.light);
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (sheetContext) => Padding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: _ProfilePalette.sheet,
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: _ProfilePalette.border),
-            boxShadow: const [
-              BoxShadow(
-                color: _ProfilePalette.shadow,
-                blurRadius: 24,
-                offset: Offset(0, 12),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: _ProfilePalette.hint,
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  'Update profile photo',
-                  style: _ProfileText.title,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Use camera, choose from library, or clear the current image.',
-                  textAlign: TextAlign.center,
-                  style: _ProfileText.body,
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ApexButton(
-                        text: 'Camera',
-                        icon: Icons.camera_alt_outlined,
-                        onPressed: () => _pickAvatar(ImageSource.camera, sheetContext),
-                        tone: ApexButtonTone.outline,
-                        color: _ProfilePalette.text,
-                        full: true,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ApexButton(
-                        text: 'Gallery',
-                        icon: Icons.photo_library_outlined,
-                        onPressed: () => _pickAvatar(ImageSource.gallery, sheetContext),
-                        tone: ApexButtonTone.outline,
-                        color: _ProfilePalette.text,
-                        full: true,
-                      ),
-                    ),
-                  ],
-                ),
-                if (_avatarData != null) ...[
-                  const SizedBox(height: 10),
-                  ApexButton(
-                    text: 'Remove photo',
-                    icon: Icons.delete_outline_rounded,
-                    onPressed: () {
-                      Navigator.pop(sheetContext);
-                      setState(() => _avatarData = null);
-                    },
-                    tone: ApexButtonTone.soft,
-                    color: _ProfilePalette.destructive,
-                    full: true,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(30),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: _ProfilePalette.sheet.withAlpha(210), // Reduced opacity for blur
+                border: Border.all(color: _ProfilePalette.border),
+                boxShadow: const [
+                  BoxShadow(
+                    color: _ProfilePalette.shadow,
+                    blurRadius: 24,
+                    offset: Offset(0, 12),
                   ),
                 ],
-              ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: _ProfilePalette.hint,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      'Update profile photo',
+                      style: _ProfileText.title,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Use camera, choose from library, or clear the current image.',
+                      textAlign: TextAlign.center,
+                      style: _ProfileText.body,
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ApexButton(
+                            text: 'Camera',
+                            icon: Icons.camera_alt_outlined,
+                            onPressed: () => _pickAvatar(ImageSource.camera, sheetContext),
+                            tone: ApexButtonTone.outline,
+                            color: _ProfilePalette.text,
+                            full: true,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ApexButton(
+                            text: 'Gallery',
+                            icon: Icons.photo_library_outlined,
+                            onPressed: () => _pickAvatar(ImageSource.gallery, sheetContext),
+                            tone: ApexButtonTone.outline,
+                            color: _ProfilePalette.text,
+                            full: true,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_avatarData != null) ...[
+                      const SizedBox(height: 10),
+                      ApexButton(
+                        text: 'Remove photo',
+                        icon: Icons.delete_outline_rounded,
+                        onPressed: () {
+                          Haptics.vibrate(HapticsType.medium);
+                          Navigator.pop(sheetContext);
+                          setState(() => _avatarData = null);
+                        },
+                        tone: ApexButtonTone.soft,
+                        color: _ProfilePalette.destructive,
+                        full: true,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -221,7 +228,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _save() async {
+    Haptics.vibrate(HapticsType.medium);
     setState(() => _loading = true);
+    
+    // Clear focus natively when saving
+    FocusScope.of(context).unfocus();
+    
     try {
       final data = <String, dynamic>{
         'name': _nameC.text.trim(),
@@ -242,6 +254,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
 
       await SupabaseService.updateProfile(SupabaseService.currentUser!.id, data);
+      
+      Haptics.vibrate(HapticsType.success);
       if (!mounted) return;
       setState(() => _saved = true);
       widget.onSaved();
@@ -251,6 +265,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       });
     } catch (e) {
+      Haptics.vibrate(HapticsType.error);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -265,6 +280,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _signOut() {
+    Haptics.vibrate(HapticsType.medium);
     Navigator.of(context).pop();
     widget.onSignOut();
   }
@@ -282,162 +298,164 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final displayName = _nameC.text.trim().isNotEmpty ? _nameC.text.trim() : 'Athlete';
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return Theme(
-      data: Theme.of(context).copyWith(
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: _ProfilePalette.field,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(22),
-            borderSide: const BorderSide(color: _ProfilePalette.border),
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(), // Tapping anywhere dismisses keyboard
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: _ProfilePalette.field,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(22),
+              borderSide: const BorderSide(color: _ProfilePalette.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(22),
+              borderSide: const BorderSide(color: _ProfilePalette.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(22),
+              borderSide: const BorderSide(color: _ProfilePalette.focus, width: 1.2),
+            ),
+            hintStyle: _ProfileText.inputHint,
+            labelStyle: _ProfileText.label,
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(22),
-            borderSide: const BorderSide(color: _ProfilePalette.border),
+          snackBarTheme: SnackBarThemeData(
+            backgroundColor: _ProfilePalette.text,
+            contentTextStyle: _ProfileText.onDark,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(22),
-            borderSide: const BorderSide(color: _ProfilePalette.focus, width: 1.2),
-          ),
-          hintStyle: _ProfileText.inputHint,
-          labelStyle: _ProfileText.label,
         ),
-        snackBarTheme: SnackBarThemeData(
-          backgroundColor: _ProfilePalette.text,
-          contentTextStyle: _ProfileText.onDark,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        ),
-      ),
-      child: Scaffold(
-        backgroundColor: _ProfilePalette.base,
-        body: Stack(
-          children: [
-            const Positioned.fill(child: _ProfileGymBackdrop()),
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.white.withAlpha(90),
-                      Colors.white.withAlpha(170),
-                      const Color(0xFFF7F8FB),
-                    ],
+        child: Scaffold(
+          backgroundColor: _ProfilePalette.base,
+          // Removed resizeToAvoidBottomInset so the button at bottom stays floating while keyboard shows,
+          // or we handle scrolling explicitly. Let's keep true but handle list padding.
+          resizeToAvoidBottomInset: true,
+          body: Stack(
+            children: [
+              const Positioned.fill(child: _ProfileGymBackdrop()),
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.white.withAlpha(90),
+                        Colors.white.withAlpha(170),
+                        const Color(0xFFF7F8FB),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            SafeArea(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
-                    child: Row(
-                      children: [
-                        _iconShell(
-                          icon: Icons.arrow_back_rounded,
-                          onTap: () => Navigator.of(context).pop(),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Profile', style: _ProfileText.pageTitle),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Gym profile synced to your workspace.',
-                                style: _ProfileText.caption,
-                              ),
-                            ],
+              SafeArea(
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+                      child: Row(
+                        children: [
+                          _iconShell(
+                            icon: Icons.arrow_back_rounded,
+                            onTap: () {
+                              Haptics.vibrate(HapticsType.light);
+                              Navigator.of(context).pop();
+                            },
                           ),
-                        ),
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 220),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: _saved ? _ProfilePalette.successSoft : _ProfilePalette.surfaceStrong,
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: _saved ? _ProfilePalette.success : _ProfilePalette.border,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Profile', style: _ProfileText.pageTitle),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Gym profile synced.',
+                                  style: _ProfileText.caption,
+                                ),
+                              ],
                             ),
                           ),
-                          child: Text(
-                            _saved ? 'Synced' : 'Gym profile',
-                            style: _saved ? _ProfileText.success : _ProfileText.captionStrong,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-                    child: _ProfileTabSwitcher(
-                      activeTab: _activeTab,
-                      onChanged: (tab) => setState(() => _activeTab = tab),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Expanded(
-                    child: IndexedStack(
-                      index: _activeTab.index,
-                      children: [
-                        _buildProfileTab(displayName: displayName, email: email, bottomInset: bottomInset),
-                        _buildGoalsTab(bottomInset: bottomInset),
-                        _buildAccountTab(email: email, bottomInset: bottomInset),
-                      ],
-                    ),
-                  ),
-                  SafeArea(
-                    top: false,
-                    minimum: EdgeInsets.fromLTRB(20, 0, 20, bottomInset + 16),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: _ProfilePalette.surfaceStrong,
-                        borderRadius: BorderRadius.circular(28),
-                        border: Border.all(color: _ProfilePalette.border),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: _ProfilePalette.shadow,
-                            blurRadius: 18,
-                            offset: Offset(0, 10),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 220),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _saved ? _ProfilePalette.successSoft : _ProfilePalette.surfaceStrong,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: _saved ? _ProfilePalette.success : _ProfilePalette.border,
+                              ),
+                            ),
+                            child: Text(
+                              _saved ? 'Synced' : 'Gym profile',
+                              style: _saved ? _ProfileText.success : _ProfileText.captionStrong,
+                            ),
                           ),
                         ],
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(10),
-                        child: ApexButton(
-                          text: _saved ? 'Saved' : 'Save changes',
-                          onPressed: _save,
-                          color: _ProfilePalette.text,
-                          full: true,
-                          loading: _loading,
-                          icon: _saved ? Icons.check_rounded : Icons.save_outlined,
+                    ),
+                    Expanded(
+                      child: _buildScrollableContent(
+                        displayName: displayName, 
+                        email: email, 
+                        bottomInset: bottomInset
+                      ),
+                    ),
+                    SafeArea(
+                      top: false,
+                      // Remove bottomInset padding from here because Scaffold handles AvoidBottomInset 
+                      minimum: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: _ProfilePalette.surfaceStrong,
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(color: _ProfilePalette.border),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: _ProfilePalette.shadow,
+                              blurRadius: 18,
+                              offset: Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: ApexButton(
+                            text: _saved ? 'Saved' : 'Save changes',
+                            onPressed: _save,
+                            color: _ProfilePalette.text,
+                            full: true,
+                            loading: _loading,
+                            icon: _saved ? Icons.check_rounded : Icons.save_outlined,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildProfileTab({
+  Widget _buildScrollableContent({
     required String displayName,
     required String email,
     required double bottomInset,
   }) {
+    // Single consolidated view
     return ListView(
-      padding: EdgeInsets.fromLTRB(20, 4, 20, bottomInset + 120),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 80),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
-        _surfacePanel(
+        // Avatar Header section
+        Center(
           child: Column(
             children: [
               ApexOrbLogo(
@@ -453,30 +471,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Text(displayName, style: _ProfileText.heroName),
               const SizedBox(height: 6),
               Text(email, style: _ProfileText.body),
-              const SizedBox(height: 16),
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  _statPill('Weight', _weightC.text.isEmpty ? 'Add' : '${_weightC.text} kg'),
-                  _statPill('Height', _heightC.text.isEmpty ? 'Add' : '${_heightC.text} cm'),
-                  if (_bmi != null) _statPill('BMI', _bmi!),
-                ],
-              ),
-              const SizedBox(height: 16),
-              ApexButton(
-                text: 'Update photo',
-                onPressed: _showAvatarOptions,
-                tone: ApexButtonTone.outline,
-                color: _ProfilePalette.text,
-                icon: Icons.image_outlined,
-                full: true,
-              ),
+              const SizedBox(height: 24),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        
+        // Personal Details Fields
+        Text('Personal Details', style: _ProfileText.sectionTitle),
+        const SizedBox(height: 12),
         _surfacePanel(
           child: Column(
             children: [
@@ -500,121 +502,95 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildGoalsTab({required double bottomInset}) {
-    return ListView(
-      padding: EdgeInsets.fromLTRB(20, 4, 20, bottomInset + 120),
-      children: [
+        
+        const SizedBox(height: 32),
+        
+        // Primary Goal Section
+        Text('Primary focus', style: _ProfileText.sectionTitle),
+        const SizedBox(height: 8),
+        Text(
+          'Set the goal your dashboard and coach should prioritize.',
+          style: _ProfileText.body,
+        ),
+        const SizedBox(height: 16),
         _surfacePanel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Primary focus', style: _ProfileText.sectionTitle),
-              const SizedBox(height: 8),
-              Text(
-                'Set the goal your dashboard and coach should prioritize.',
-                style: _ProfileText.body,
-              ),
-              const SizedBox(height: 18),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: _goals.map((goal) {
-                  final selected = _goal == goal;
-                  return GestureDetector(
-                    onTap: () => setState(() => _goal = goal),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      curve: Curves.easeOutCubic,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: selected ? _ProfilePalette.goalSelected : _ProfilePalette.surface,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: selected ? _ProfilePalette.focus : _ProfilePalette.border,
-                        ),
-                        boxShadow: selected
-                            ? const [
-                                BoxShadow(
-                                  color: _ProfilePalette.highlightShadow,
-                                  blurRadius: 14,
-                                  offset: Offset(0, 8),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (selected) ...[
-                            Container(
-                              width: 18,
-                              height: 18,
-                              decoration: const BoxDecoration(
-                                color: _ProfilePalette.text,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(Icons.check_rounded, size: 12, color: Colors.white),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          Text(
-                            goal,
-                            style: selected ? _ProfileText.goalActive : _ProfileText.goal,
-                          ),
-                        ],
-                      ),
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: _goals.map((goal) {
+              final selected = _goal == goal;
+              return GestureDetector(
+                onTap: () {
+                  Haptics.vibrate(HapticsType.selection);
+                  setState(() => _goal = goal);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: selected ? _ProfilePalette.goalSelected : _ProfilePalette.surface,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: selected ? _ProfilePalette.focus : _ProfilePalette.border,
                     ),
-                  );
-                }).toList(),
-              ),
-            ],
+                    boxShadow: selected
+                        ? const [
+                            BoxShadow(
+                              color: _ProfilePalette.highlightShadow,
+                              blurRadius: 14,
+                              offset: Offset(0, 8),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (selected) ...[
+                        Container(
+                          width: 18,
+                          height: 18,
+                          decoration: const BoxDecoration(
+                            color: _ProfilePalette.text,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.check_rounded, size: 12, color: Colors.white),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Text(
+                        goal,
+                        style: selected ? _ProfileText.goalActive : _ProfileText.goal,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildAccountTab({required String email, required double bottomInset}) {
-    return ListView(
-      padding: EdgeInsets.fromLTRB(20, 4, 20, bottomInset + 120),
-      children: [
-        _surfacePanel(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Account', style: _ProfileText.sectionTitle),
-              const SizedBox(height: 8),
-              Text(
-                'All profile changes sync to your Supabase project automatically.',
-                style: _ProfileText.body,
-              ),
-              const SizedBox(height: 18),
-              _readOnlyTile(
-                icon: Icons.alternate_email_rounded,
-                label: 'Email',
-                value: email,
-              ),
-              const SizedBox(height: 12),
-              _readOnlyTile(
-                icon: Icons.cloud_done_rounded,
-                label: 'Sync status',
-                value: 'Connected to your gym workspace',
-              ),
-              const SizedBox(height: 18),
-              ApexButton(
-                text: 'Sign out',
-                onPressed: _signOut,
-                tone: ApexButtonTone.soft,
-                color: _ProfilePalette.destructive,
-                full: true,
-                icon: Icons.logout_rounded,
-              ),
-            ],
-          ),
+        
+        const SizedBox(height: 32),
+        
+        // Account Status
+        Text('Status', style: _ProfileText.sectionTitle),
+        const SizedBox(height: 12),
+        _readOnlyTile(
+          icon: Icons.cloud_done_rounded,
+          label: 'Sync info',
+          value: 'All changes sync automatically',
+        ),
+        const SizedBox(height: 24),
+        
+        // Sign out button
+        ApexButton(
+          text: 'Sign out',
+          onPressed: _signOut,
+          tone: ApexButtonTone.soft,
+          color: _ProfilePalette.destructive,
+          full: true,
+          icon: Icons.logout_rounded,
         ),
       ],
     );
@@ -659,25 +635,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _statPill(String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: _ProfilePalette.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _ProfilePalette.border),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label.toUpperCase(), style: _ProfileText.label),
-          const SizedBox(height: 4),
-          Text(value, style: _ProfileText.stat),
-        ],
-      ),
-    );
-  }
-
   Widget _field(
     String label,
     TextEditingController controller,
@@ -691,7 +648,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const SizedBox(height: 8),
         TextField(
           controller: controller,
-          keyboardType: number ? TextInputType.number : TextInputType.text,
+          keyboardType: number 
+            ? const TextInputType.numberWithOptions(decimal: true) 
+            : TextInputType.text,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => FocusScope.of(context).unfocus(),
           style: _ProfileText.input,
           decoration: InputDecoration(hintText: hint),
         ),
@@ -749,82 +710,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _calGoalC.dispose();
     _waterGoalC.dispose();
     super.dispose();
-  }
-}
-
-class _ProfileTabSwitcher extends StatelessWidget {
-  final ProfileTab activeTab;
-  final ValueChanged<ProfileTab> onChanged;
-
-  const _ProfileTabSwitcher({
-    required this.activeTab,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    const tabs = [
-      (ProfileTab.profile, 'Profile'),
-      (ProfileTab.goals, 'Goals'),
-      (ProfileTab.account, 'Account'),
-    ];
-
-    return Container(
-      height: 56,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: _ProfilePalette.tabTrack,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: _ProfilePalette.border),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final segmentWidth = (constraints.maxWidth - 8) / tabs.length;
-          return Stack(
-            children: [
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                left: segmentWidth * activeTab.index,
-                top: 0,
-                bottom: 0,
-                width: segmentWidth,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(999),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: _ProfilePalette.shadow,
-                        blurRadius: 12,
-                        offset: Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Row(
-                children: tabs.map((entry) {
-                  final selected = entry.$1 == activeTab;
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => onChanged(entry.$1),
-                      behavior: HitTestBehavior.opaque,
-                      child: Center(
-                        child: Text(
-                          entry.$2,
-                          style: selected ? _ProfileText.tabActive : _ProfileText.tab,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ],
-          );
-        },
-      ),
-    );
   }
 }
 
