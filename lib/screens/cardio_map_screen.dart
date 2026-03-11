@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import '../constants/colors.dart';
@@ -21,7 +20,7 @@ class _CardioMapScreenState extends State<CardioMapScreen> {
   final Completer<GoogleMapController> _controller = Completer();
   StreamSubscription<Position>? _positionStream;
   
-  List<LatLng> _routeCoords = [];
+  final List<LatLng> _routeCoords = [];
   double _totalDistanceMeters = 0;
   int _elapsedSeconds = 0;
   Timer? _timer;
@@ -227,10 +226,10 @@ class _CardioMapScreenState extends State<CardioMapScreen> {
             child: Container(
               padding: EdgeInsets.fromLTRB(24, 24, 24, MediaQuery.of(context).padding.bottom + 24),
               decoration: BoxDecoration(
-                color: ApexColors.bg.withOpacity(0.95),
+                color: ApexColors.bg.withValues(alpha: 0.95),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20, offset: const Offset(0, -5)),
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 20, offset: const Offset(0, -5)),
                 ],
               ),
               child: Column(

@@ -408,7 +408,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${entry.value['sets']} sets · ${entry.value['reps']} reps${entry.value['target_weight'] != null ? ' · ' + entry.value['target_weight'].toString() + 'kg' : ''}',
+                              '${entry.value['sets']} sets · ${entry.value['reps']} reps${entry.value['target_weight'] != null ? ' · ${entry.value['target_weight']}kg' : ''}',
                               style: GoogleFonts.inter(
                                 fontSize: 11,
                                 color: ApexColors.t2,

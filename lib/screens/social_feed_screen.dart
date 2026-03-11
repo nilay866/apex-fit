@@ -290,7 +290,7 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
                 ),
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );

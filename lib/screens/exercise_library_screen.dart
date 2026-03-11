@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:haptic_feedback/haptic_feedback.dart';
 import '../constants/colors.dart';
-import '../constants/theme.dart';
 import '../services/supabase_service.dart';
 import 'exercise_detail_screen.dart';
 
@@ -24,7 +23,6 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
 
   final List<String> _muscles = ['Chest', 'Back', 'Legs', 'Arms', 'Shoulders', 'Core'];
   final List<String> _environments = ['Gym', 'Home'];
-  final List<String> _equipments = ['Barbell', 'Dumbbell', 'Machine', 'Bodyweight', 'Cables'];
 
   @override
   void initState() {
@@ -39,10 +37,12 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
       environment: _selectedEnv,
       equipment: _selectedEquipment,
     );
-    if (mounted) setState(() {
+    if (mounted) {
+      setState(() {
       _exercises = res;
       _loading = false;
     });
+    }
   }
 
   void _onMuscleTap(String muscle) {

@@ -1,6 +1,4 @@
 import 'dart:convert';
-import 'package:google_generative_ai/google_generative_ai.dart';
-import 'supabase_service.dart';
 import 'ai_service.dart';
 
 class PlanGeneratorService {

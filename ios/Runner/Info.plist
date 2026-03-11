@@ -2,9 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-<key>NSSupportsLiveActivities</key>
-<true/>
-
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -31,42 +28,35 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Apex AI uses the camera so you can capture profile and progress photos.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Apex AI uses your photo library so you can choose profile and progress photos.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Apex AI saves selected photos to your training profile and progress log.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>We will sync your data with the Apple Health app to give you better insights</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>We will sync your data with the Apple Health app to give you better insights</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Apex AI uses your location to track your cardio and runs</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Apex AI uses your location to track your cardio workouts in the background</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Apex AI uses your location to track your cardio and runs</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Apex AI saves selected photos to your training profile and progress log.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Apex AI uses your photo library so you can choose profile and progress photos.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Apex AI requires microphone access to record videos if needed.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
-<key>NSSupportsLiveActivities</key>
-<true/>
-
 		<key>UIApplicationSupportsMultipleScenes</key>
 		<false/>
 		<key>UISceneConfigurations</key>
 		<dict>
-<key>NSSupportsLiveActivities</key>
-<true/>
-
 			<key>UIWindowSceneSessionRoleApplication</key>
 			<array>
 				<dict>
-<key>NSSupportsLiveActivities</key>
-<true/>
-
 					<key>UISceneClassName</key>
 					<string>UIWindowScene</string>
 					<key>UISceneConfigurationName</key>
 					<string>flutter</string>
 					<key>UISceneDelegateClassName</key>
-					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+					<string>FlutterSceneDelegate</string>
 					<key>UISceneStoryboardFile</key>
 					<string>Main</string>
 				</dict>

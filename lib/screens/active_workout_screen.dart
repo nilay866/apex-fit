@@ -6,9 +6,7 @@ import '../constants/theme.dart';
 import '../widgets/apex_button.dart';
 import '../services/supabase_service.dart';
 import '../services/storage_service.dart';
-import '../widgets/apex_orb_logo.dart';
 import 'package:flutter/services.dart';
-import '../widgets/apex_orb_logo.dart';
 
 class ActiveWorkoutScreen extends StatefulWidget {
   final Map<String, dynamic> workout;
@@ -25,7 +23,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   int _cur = 0;
   int _timer = 0;
   List<Map<String, dynamic>> _previousSets = [];
-  Map<int, String> _exNotes = {};
+  final Map<int, String> _exNotes = {};
   final _exNoteC = TextEditingController();
   int? _focusedEx;
   int? _focusedSet;
@@ -36,8 +34,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   bool _showEnd = false;
   Timer? _tRef;
   Timer? _rRef;
-  
-  String? _activityId;
 
   @override
   void initState() {
@@ -95,9 +91,13 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       final s = _logs[ei]![si];
       final cur = s['type'] as String? ?? 'normal';
       String n = 'normal';
-      if (cur == 'normal') n = 'warmup';
-      else if (cur == 'warmup') n = 'drop';
-      else if (cur == 'drop') n = 'failure';
+      if (cur == 'normal') {
+        n = 'warmup';
+      } else if (cur == 'warmup') {
+        n = 'drop';
+      } else if (cur == 'drop') {
+        n = 'failure';
+      }
       s['type'] = n;
     });
   }
@@ -197,7 +197,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       final currSets = _logs[ei] ?? [];
       
       int pVol = 0;
-      for (var s in prevSets) pVol += (int.tryParse(s['reps']?.toString() ?? '0') ?? 0) * (double.tryParse(s['weight']?.toString() ?? '0')?.round() ?? 0);
+      for (var s in prevSets) {
+        pVol += (int.tryParse(s['reps']?.toString() ?? '0') ?? 0) * (double.tryParse(s['weight']?.toString() ?? '0')?.round() ?? 0);
+      }
       
       int cVol = 0;
       for (var s in currSets) {
@@ -392,9 +394,13 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
                           String tLabel = '${si + 1}';
                           final tVal = s['type'] as String? ?? 'normal';
-                          if (tVal == 'warmup') tLabel = 'W';
-                          else if (tVal == 'drop') tLabel = 'D';
-                          else if (tVal == 'failure') tLabel = 'F';
+                          if (tVal == 'warmup') {
+                            tLabel = 'W';
+                          } else if (tVal == 'drop') {
+                            tLabel = 'D';
+                          } else if (tVal == 'failure') {
+                            tLabel = 'F';
+                          }
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 7),
@@ -427,7 +433,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                                     style: ApexTheme.mono(size: 16),
                                     decoration: InputDecoration(
                                       hintText: pReps,
-                                      hintStyle: ApexTheme.mono(size: 16, color: ApexColors.t3.withOpacity(0.4)),
+                                      hintStyle: ApexTheme.mono(size: 16, color: ApexColors.t3.withValues(alpha: 0.4)),
                                       contentPadding: const EdgeInsets.symmetric(vertical: 8),
                                       filled: true, fillColor: ApexColors.surface,
                                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(7), borderSide: BorderSide(color: ApexColors.border)),
@@ -445,7 +451,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                                     style: ApexTheme.mono(size: 16),
                                     decoration: InputDecoration(
                                       hintText: pWeight,
-                                      hintStyle: ApexTheme.mono(size: 16, color: ApexColors.t3.withOpacity(0.4)),
+                                      hintStyle: ApexTheme.mono(size: 16, color: ApexColors.t3.withValues(alpha: 0.4)),
                                       contentPadding: const EdgeInsets.symmetric(vertical: 8),
                                       filled: true, fillColor: ApexColors.surface,
                                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(7), borderSide: BorderSide(color: ApexColors.border)),

@@ -484,7 +484,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               _miniStat(
                 Icons.directions_walk_rounded,
-                _loading ? '—' : '${_steps}',
+                _loading ? '—' : '$_steps',
                 'Steps',
                 ApexColors.orange,
               ),

@@ -19,7 +19,7 @@ class NutritionScreen extends StatefulWidget {
 class _NutritionScreenState extends State<NutritionScreen> {
   List<Map<String, dynamic>> _logs = [];
   bool _loading = true;
-  bool _showAdd = false;
+
   final _foodC = TextEditingController();
   final _qtyC = TextEditingController();
   final _calC = TextEditingController();
@@ -43,50 +43,15 @@ class _NutritionScreenState extends State<NutritionScreen> {
         SupabaseService.currentUser!.id,
         limit: 50,
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _logs = l;
           _loading = false;
         });
+      }
     } catch (e) {
       if (mounted) setState(() => _loading = false);
     }
-  }
-
-  Future<void> _aiLookup() async {
-    if (_foodC.text.trim().isEmpty) {
-      Haptics.vibrate(HapticsType.error);
-      setState(() => _aiErr = 'Enter food name first.');
-      return;
-    }
-
-    Haptics.vibrate(HapticsType.light);
-    setState(() {
-      _aiLoading = true;
-      _aiErr = '';
-    });
-    try {
-      final d = await AIService.lookupNutrition(
-        _foodC.text.trim(),
-        _qtyC.text.trim(),
-      );
-      if (mounted) {
-        setState(() {
-          if (d['calories'] != null)
-            _calC.text = '${(d['calories'] as num).round()}';
-          if (d['protein_g'] != null)
-            _protC.text = '${(d['protein_g'] as num).round()}';
-          if (d['carbs_g'] != null)
-            _carbsC.text = '${(d['carbs_g'] as num).round()}';
-          if (d['fat_g'] != null) _fatC.text = '${(d['fat_g'] as num).round()}';
-        });
-        Haptics.vibrate(HapticsType.success);
-      }
-    } catch (e) {
-      Haptics.vibrate(HapticsType.error);
-      if (mounted) setState(() => _aiErr = 'AI lookup failed: $e');
-    }
-    if (mounted) setState(() => _aiLoading = false);
   }
 
   Future<void> _saveMeal() async {
@@ -121,7 +86,6 @@ class _NutritionScreenState extends State<NutritionScreen> {
       Haptics.vibrate(HapticsType.success);
       if (mounted) {
         setState(() {
-          _showAdd = false;
           _aiErr = '';
         });
         _load();
@@ -143,7 +107,6 @@ class _NutritionScreenState extends State<NutritionScreen> {
   void _showAddModal() {
     Haptics.vibrate(HapticsType.light);
     setState(() {
-      _showAdd = true;
       _aiErr = '';
     });
 
@@ -221,8 +184,9 @@ class _NutritionScreenState extends State<NutritionScreen> {
                       builder: (context, setModalState) {
                         return GestureDetector(
                           onTap: () {
-                            if (_aiLoading || _foodC.text.trim().isEmpty)
+                            if (_aiLoading || _foodC.text.trim().isEmpty) {
                               return;
+                            }
 
                             // Run lookup logic and update modal state manually alongside outer state
                             Haptics.vibrate(HapticsType.light);
@@ -242,18 +206,22 @@ class _NutritionScreenState extends State<NutritionScreen> {
                                 .then((d) {
                                   if (mounted) {
                                     setModalState(() {
-                                      if (d['calories'] != null)
+                                      if (d['calories'] != null) {
                                         _calC.text =
                                             '${(d['calories'] as num).round()}';
-                                      if (d['protein_g'] != null)
+                                      }
+                                      if (d['protein_g'] != null) {
                                         _protC.text =
                                             '${(d['protein_g'] as num).round()}';
-                                      if (d['carbs_g'] != null)
+                                      }
+                                      if (d['carbs_g'] != null) {
                                         _carbsC.text =
                                             '${(d['carbs_g'] as num).round()}';
-                                      if (d['fat_g'] != null)
+                                      }
+                                      if (d['fat_g'] != null) {
                                         _fatC.text =
                                             '${(d['fat_g'] as num).round()}';
+                                      }
                                       _aiLoading = false;
                                     });
                                     setState(() {
@@ -414,7 +382,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
                                 text: 'Save Meal',
                                 onPressed: () {
                                   _saveMeal().then((_) {
-                                    if (!mounted) return;
+                                    if (!ctx.mounted) return;
                                     Navigator.pop(ctx);
                                   });
                                 },
@@ -433,9 +401,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
           ),
         ),
       ),
-    ).then((_) {
-      if (mounted) setState(() => _showAdd = false);
-    });
+    );
   }
 
   @override

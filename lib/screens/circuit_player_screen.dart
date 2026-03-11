@@ -89,7 +89,6 @@ class _CircuitPlayerScreenState extends State<CircuitPlayerScreen> {
       _startPhase('work', workDuration);
     } else if (_phase == 'work') {
       // Finished work, move to rest or next exercise or done
-      final reps = int.tryParse(_exercises[_curExIdx]['sets']?.toString() ?? '1') ?? 1;
       // In a real circuit, we might loop sets, but let's assume flat list for now.
       if (_curExIdx < _exercises.length - 1) {
         int restDuration = int.tryParse(_exercises[_curExIdx]['rest_sec']?.toString() ?? '15') ?? 15;

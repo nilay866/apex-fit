@@ -176,17 +176,31 @@ class _ApexOrbLogoState extends State<ApexOrbLogo>
       if (imageData.startsWith('data:')) {
         final base64String = imageData.split(',').last;
         try {
-          final decoded = base64Decode(base64String);
-          return Image.memory(decoded, fit: BoxFit.cover);
+          final decoded = base64Decode(base64String.replaceAll(RegExp(r'\s+'), ''));
+          return Image.memory(
+            decoded, 
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (context, error, stackTrace) => _initialsWidget(initials),
+          );
         } catch (e) {
-          print('Failed to decode avatar: $e');
+          return _initialsWidget(initials);
         }
       }
-      if (imageData.startsWith('http://') || imageData.startsWith('https://')) {
-        return Image.network(imageData, fit: BoxFit.cover);
+      if (imageData.startsWith('http')) {
+        return Image.network(
+          imageData, 
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          errorBuilder: (context, error, stackTrace) => _initialsWidget(initials),
+        );
       }
     }
 
+    return _initialsWidget(initials);
+  }
+
+  Widget _initialsWidget(String initials) {
     return Center(
       child: Text(
         initials,

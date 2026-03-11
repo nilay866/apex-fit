@@ -783,44 +783,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Widget _summaryCard(IconData icon, String value, String label, Color color) {
-    return SizedBox(
-      width: (MediaQuery.of(context).size.width - 40) / 2,
-      child: ApexCard(
-        child: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: color.withAlpha(18),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: color.withAlpha(54)),
-              ),
-              child: Icon(icon, size: 18, color: color),
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(value, style: ApexTheme.mono(size: 16, color: color)),
-                Text(
-                  label.toUpperCase(),
-                  style: GoogleFonts.inter(
-                    fontSize: 9,
-                    color: ApexColors.t3,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.4,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _bwStat(String label, String value, Color color) {
     return Column(
       children: [

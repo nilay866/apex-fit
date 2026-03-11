@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui';
-import 'package:flutter/services.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -108,10 +107,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _avatarData = avatarData;
       });
+      // Auto-save the photo immediately for better UX
+      await _save();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Photo update failed: ${SupabaseService.describeError(e)}')),
+        SnackBar(
+          content: Text('Photo update failed: ${SupabaseService.describeError(e)}'),
+          backgroundColor: _ProfilePalette.text,
+        ),
       );
     }
   }
@@ -119,9 +123,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<String> _encodeAvatar(XFile file) async {
     final compressedBytes = await FlutterImageCompress.compressWithFile(
       file.path,
-      quality: 75,
-      minWidth: 400,
-      minHeight: 400,
+      quality: 60,
+      minWidth: 300,
+      minHeight: 300,
       format: CompressFormat.jpeg,
     );
     final bytes = compressedBytes ?? await file.readAsBytes();
@@ -285,12 +289,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     widget.onSignOut();
   }
 
-  String? get _bmi {
-    final w = double.tryParse(_weightC.text);
-    final h = double.tryParse(_heightC.text);
-    if (w == null || h == null || h == 0) return null;
-    return (w / ((h / 100) * (h / 100))).toStringAsFixed(1);
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -839,7 +838,6 @@ class _ProfilePalette {
   static const Color surface = Color(0xE9FFFFFF);
   static const Color surfaceStrong = Color(0xF3FFFFFF);
   static const Color field = Color(0xF7FFFFFF);
-  static const Color tabTrack = Color(0xD9EEF1F4);
   static const Color border = Color(0x160E1620);
   static const Color text = Color(0xFF13171B);
   static const Color textSoft = Color(0xFF64707C);
@@ -928,23 +926,6 @@ class _ProfileText {
     fontWeight: FontWeight.w500,
   );
 
-  static final TextStyle stat = GoogleFonts.dmMono(
-    fontSize: 15,
-    fontWeight: FontWeight.w700,
-    color: _ProfilePalette.text,
-  );
-
-  static final TextStyle tab = GoogleFonts.inter(
-    fontSize: 13,
-    fontWeight: FontWeight.w600,
-    color: _ProfilePalette.textSoft,
-  );
-
-  static final TextStyle tabActive = GoogleFonts.inter(
-    fontSize: 13,
-    fontWeight: FontWeight.w700,
-    color: _ProfilePalette.text,
-  );
 
   static final TextStyle goal = GoogleFonts.inter(
     fontSize: 13,

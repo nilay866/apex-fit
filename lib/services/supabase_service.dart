@@ -233,7 +233,7 @@ class SupabaseService {
         } catch (e) {
           // If a specific log fails, keep it in the queue by not clearing
           // In a robust implementation, you might track retry counts.
-          print('Failed to sync offline log: $e');
+          // Failed to sync offline log
         }
       }
       
@@ -250,7 +250,7 @@ class SupabaseService {
       }
 
     } catch (e) {
-      print('Sync offline workouts error: $e');
+      // Sync offline workouts error
     }
   }
 

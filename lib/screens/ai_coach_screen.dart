@@ -428,7 +428,7 @@ class _MacrocyclePlannerTabState extends State<_MacrocyclePlannerTab> {
                     ],
                   ),
                 );
-              }).toList(),
+              }),
             ],
           ),
         );

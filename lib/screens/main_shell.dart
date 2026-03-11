@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:haptic_feedback/haptic_feedback.dart';
 import '../constants/colors.dart';
 import '../services/supabase_service.dart';
@@ -28,7 +27,6 @@ class _MainShellState extends State<MainShell> {
   int _tab = 0;
   Map<String, dynamic>? _profile;
   Map<String, dynamic>? _activeWorkout;
-  List<Map<String, dynamic>> _recentLogs = [];
 
   static const _navItems = [
     {'icon': Icons.home_rounded, 'label': 'Home'},
@@ -43,15 +41,12 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     _loadProfile();
-    _loadRecentLogs();
     _syncOfflineData();
   }
 
   Future<void> _syncOfflineData() async {
     // Fire and forget sync
-    SupabaseService.syncOfflineWorkouts().then((_) {
-      if (mounted) _loadRecentLogs(); // Refresh logs if sync succeeded
-    });
+    SupabaseService.syncOfflineWorkouts();
   }
 
   Future<void> _loadProfile() async {
@@ -63,17 +58,7 @@ class _MainShellState extends State<MainShell> {
     } catch (_) {}
   }
 
-  Future<void> _loadRecentLogs() async {
-    try {
-      final logs = await SupabaseService.getWorkoutLogs(
-        SupabaseService.currentUser!.id,
-        limit: 5,
-      );
-      if (mounted) {
-        setState(() => _recentLogs = logs);
-      }
-    } catch (_) {}
-  }
+
 
   void _startWorkout(Map<String, dynamic> workout) {
     setState(() => _activeWorkout = workout);
@@ -84,7 +69,6 @@ class _MainShellState extends State<MainShell> {
       _activeWorkout = null;
       _tab = 4; // Switch to Stats after workout
     });
-    _loadRecentLogs();
   }
 
   void _showProfile() {
