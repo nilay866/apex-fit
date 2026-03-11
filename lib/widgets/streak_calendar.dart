@@ -5,18 +5,28 @@ import 'apex_card.dart';
 
 class StreakCalendar extends StatelessWidget {
   final List<Map<String, dynamic>> logs;
+  final List<Map<String, dynamic>> photos;
 
-  const StreakCalendar({super.key, required this.logs});
+  const StreakCalendar({super.key, required this.logs, required this.photos});
 
   @override
   Widget build(BuildContext context) {
     final workoutDates = <String>{};
     final intensityMap = <String, String>{};
+    final photoDates = <String>{};
+
     for (final log in logs) {
       final date = (log['completed_at'] as String?)?.split('T')[0];
       if (date != null) {
         workoutDates.add(date);
         intensityMap[date] = (log['intensity'] as String?) ?? 'moderate';
+      }
+    }
+
+    for (final photo in photos) {
+      final date = (photo['taken_at'] as String?)?.split('T')[0];
+      if (date != null) {
+        photoDates.add(date);
       }
     }
 
@@ -115,6 +125,8 @@ class StreakCalendar extends StatelessWidget {
               _legend('Mod', ApexColors.blue),
               const SizedBox(width: 8),
               _legend('Light', ApexColors.accentSoft),
+              const SizedBox(width: 8),
+              _legend('Photo', ApexColors.purple),
             ],
           ),
           const SizedBox(height: 16),
@@ -154,13 +166,30 @@ class StreakCalendar extends StatelessWidget {
                           border: Border.all(color: borderFor(date)),
                         ),
                         alignment: Alignment.center,
-                        child: Text(
-                          '${date.day}',
-                          style: GoogleFonts.dmMono(
-                            fontSize: 11,
-                            fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
-                            color: isOutsideMonth ? textFor(date).withAlpha(100) : textFor(date),
-                          ),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Text(
+                              '${date.day}',
+                              style: GoogleFonts.dmMono(
+                                fontSize: 11,
+                                fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+                                color: isOutsideMonth ? textFor(date).withAlpha(100) : textFor(date),
+                              ),
+                            ),
+                            if (photoDates.contains(_key(date)))
+                              Positioned(
+                                bottom: 4,
+                                child: Container(
+                                  width: 3.5,
+                                  height: 3.5,
+                                  decoration: const BoxDecoration(
+                                    color: ApexColors.purple,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ),

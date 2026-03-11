@@ -9,7 +9,6 @@ import 'active_workout_screen.dart';
 import 'home_screen.dart';
 import 'nutrition_screen.dart';
 import 'social_feed_screen.dart';
-import 'photos_screen.dart';
 import 'reports_screen.dart';
 import 'workout_screen.dart';
 import 'circuit_player_screen.dart';
@@ -33,7 +32,6 @@ class _MainShellState extends State<MainShell> {
     {'icon': Icons.fitness_center_rounded, 'label': 'Train'},
     {'icon': Icons.public_rounded, 'label': 'Social'},
     {'icon': Icons.restaurant_menu_rounded, 'label': 'Fuel'},
-    {'icon': Icons.photo_camera_back_rounded, 'label': 'Photos'},
     {'icon': Icons.bar_chart_rounded, 'label': 'Stats'},
   ];
 
@@ -138,7 +136,6 @@ class _MainShellState extends State<MainShell> {
                     WorkoutScreen(onStartWorkout: _startWorkout),
                     const SocialFeedScreen(),
                     const NutritionScreen(),
-                    const PhotosScreen(),
                     const ReportsScreen(),
                   ],
                 ),

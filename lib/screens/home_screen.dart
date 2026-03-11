@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import '../constants/colors.dart';
 import '../constants/theme.dart';
 import '../widgets/apex_card.dart';
@@ -12,6 +14,7 @@ import '../widgets/streak_calendar.dart';
 import '../services/ai_service.dart';
 import '../services/health_service.dart';
 import '../services/supabase_service.dart';
+import '../services/cache_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final Map<String, dynamic>? profile;
@@ -30,9 +33,14 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _waterLogs = [];
   List<Map<String, dynamic>> _bwLogs = [];
   List<Map<String, dynamic>> _photos = [];
-  int _steps = 0;
-  double _activeEnergy = 0.0;
-  bool _loading = true;
+
+  // Statistical Notifiers for surgical UI updates
+  late final ValueNotifier<int> _waterNotifier;
+  late final ValueNotifier<int> _stepsNotifier;
+  late final ValueNotifier<double> _energyNotifier;
+  late final ValueNotifier<int> _calorieNotifier;
+
+  bool _loading = false;
   String _suggestion = '';
   bool _loadingSug = false;
   bool _addWater = false;
@@ -43,53 +51,80 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // Synchronous hydration from cache for sub-20ms TTI
+    _logs = cache.get<List<Map<String, dynamic>>>(CacheService.keyHomeLogs) ?? [];
+    _workouts = cache.get<List<Map<String, dynamic>>>(CacheService.keyHomeWorkouts) ?? [];
+    _waterLogs = cache.get<List<Map<String, dynamic>>>(CacheService.keyWaterLogs) ?? [];
+    
+    _waterNotifier = ValueNotifier<int>(_calculateTotalWater(_waterLogs));
+    _stepsNotifier = ValueNotifier<int>(0);
+    _energyNotifier = ValueNotifier<double>(0.0);
+    _calorieNotifier = ValueNotifier<int>(0);
+
     _load();
   }
 
+  int _calculateTotalWater(List<Map<String, dynamic>> logs) {
+    return logs.fold(0, (sum, log) => sum + (log['amount_ml'] as int? ?? 0));
+  }
+
+  @override
+  void dispose() {
+    _waterNotifier.dispose();
+    _stepsNotifier.dispose();
+    _energyNotifier.dispose();
+    _calorieNotifier.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
-    setState(() => _loading = true);
+    // If we have cached data, we don't show the skeleton loader
+    if (_logs.isEmpty && _workouts.isEmpty) {
+      setState(() => _loading = true);
+    }
+
     final userId = SupabaseService.currentUser!.id;
-    final today = DateTime.now().toIso8601String().split('T')[0];
-    final waterFuture = SupabaseService.getWaterLogs(
-      userId,
-      since: DateTime.parse('${today}T00:00:00'),
-    );
+    final todayStr = DateTime.now().toIso8601String().split('T')[0];
+    
     try {
       final results = await Future.wait([
         SupabaseService.getWorkoutLogs(userId, limit: 14),
         SupabaseService.getWorkouts(userId),
-        SupabaseService.getNutritionLogs(
-          userId,
-          since: DateTime.parse('${today}T00:00:00'),
-        ),
+        SupabaseService.getNutritionLogs(userId, since: DateTime.parse('${todayStr}T00:00:00')),
         SupabaseService.getBodyWeightLogs(userId, limit: 3),
         SupabaseService.getProgressPhotos(userId),
+        SupabaseService.getWaterLogs(userId, since: DateTime.parse('${todayStr}T00:00:00')),
       ]);
-      List<Map<String, dynamic>> waterLogs = [];
-      String? waterError;
-      try {
-        waterLogs = await waterFuture;
-      } catch (e) {
-        waterError = SupabaseService.describeError(e);
-      }
+      
       final healthData = await HealthService.fetchDailySummary();
 
       if (!mounted) return;
+
+      // Atomic state update and cache persistence
       setState(() {
         _logs = results[0];
         _workouts = results[1];
         _nutritionLogs = results[2];
-        _waterLogs = waterLogs;
         _bwLogs = results[3];
         _photos = results[4];
-        _waterError = waterError;
-        _steps = healthData['steps'] as int;
-        _activeEnergy = healthData['energy'] as double;
+        _waterLogs = results[5];
         _loading = false;
+        
+        // Update notifiers without triggering full rebuild
+        _waterNotifier.value = _calculateTotalWater(_waterLogs);
+        _stepsNotifier.value = healthData['steps'] as int;
+        _energyNotifier.value = healthData['energy'] as double;
+        _calorieNotifier.value = _nutritionLogs.fold(0, (sum, l) => sum + (l['calories'] as int? ?? 0));
+        
+        // Sync to Holographic Cache
+        cache.setList(CacheService.keyHomeLogs, _logs);
+        cache.setList(CacheService.keyHomeWorkouts, _workouts);
+        cache.setList(CacheService.keyWaterLogs, _waterLogs);
       });
+      
       _loadSuggestion();
     } catch (e) {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -131,6 +166,111 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _pickImage(ImageSource source) async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(
+      source: source,
+      maxWidth: 1200,
+      imageQuality: 70,
+    );
+    if (file == null) return;
+
+    setState(() => _loading = true);
+
+    try {
+      final bytes = await FlutterImageCompress.compressWithFile(
+        file.path,
+        quality: 60,
+        minWidth: 800,
+        minHeight: 800,
+        format: CompressFormat.jpeg,
+      ) ?? await file.readAsBytes();
+      
+      final base64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      await SupabaseService.createProgressPhoto(
+        SupabaseService.currentUser!.id,
+        base64,
+        null, // Optional caption could be added later
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Progress photo added to your journey!'),
+            backgroundColor: ApexColors.accent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Upload failed: ${SupabaseService.describeError(e)}'),
+            backgroundColor: ApexColors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      setState(() => _loading = false);
+    }
+  }
+
+  void _showAddPhotoSource() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: ApexColors.surfaceStrong,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Capture Progress',
+              style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18, color: ApexColors.t1),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: ApexButton(
+                    text: 'Camera',
+                    icon: Icons.camera_alt_outlined,
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      _pickImage(ImageSource.camera);
+                    },
+                    tone: ApexButtonTone.outline,
+                    full: true,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ApexButton(
+                    text: 'Gallery',
+                    icon: Icons.photo_library_outlined,
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      _pickImage(ImageSource.gallery);
+                    },
+                    tone: ApexButtonTone.outline,
+                    full: true,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _logWater() async {
     final ml = int.tryParse(_waterAmt);
     if (ml == null || ml <= 0) return;
@@ -144,8 +284,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ml,
       );
       if (!mounted) return;
+
+      // Surgical update via notifier instead of full screen rebuild
+      _waterLogs = [..._waterLogs, log];
+      _waterNotifier.value = _calculateTotalWater(_waterLogs);
+      cache.setList(CacheService.keyWaterLogs, _waterLogs);
+      
       setState(() {
-        _waterLogs = [..._waterLogs, log];
         _waterAmt = '250';
         _waterError = null;
       });
@@ -185,15 +330,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final todayCal = _nutritionLogs.fold<int>(
-      0,
-      (a, l) => a + ((l['calories'] as int?) ?? 0),
-    );
     final calGoal = (widget.profile?['calorie_goal'] as int?) ?? 2000;
-    final totalWater = _waterLogs.fold<int>(
-      0,
-      (a, w) => a + ((w['amount_ml'] as int?) ?? 0),
-    );
     final waterGoal = (widget.profile?['water_goal_ml'] as int?) ?? 2500;
     final latestBW = _bwLogs.isNotEmpty ? _bwLogs[0]['weight_kg'] : null;
     final hour = DateTime.now().hour;
@@ -272,17 +409,29 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: _statCard(
-                  'Calories',
-                  todayCal,
-                  calGoal,
-                  Icons.local_fire_department_rounded,
-                  ApexColors.orange,
-                  'kcal',
+                child: ValueListenableBuilder<int>(
+                  valueListenable: _calorieNotifier,
+                  builder: (context, val, _) {
+                    return _statCard(
+                      'Calories',
+                      val,
+                      calGoal,
+                      Icons.local_fire_department_rounded,
+                      ApexColors.orange,
+                      'kcal',
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 9),
-              Expanded(child: _waterCard(totalWater, waterGoal)),
+              Expanded(
+                child: ValueListenableBuilder<int>(
+                  valueListenable: _waterNotifier,
+                  builder: (context, val, _) {
+                    return _waterCard(val, waterGoal);
+                  },
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -390,7 +539,9 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 14),
           _journeyGallery(journeyStages),
           const SizedBox(height: 14),
-          StreakCalendar(logs: _logs),
+          RepaintBoundary(
+            child: StreakCalendar(logs: _logs, photos: _photos),
+          ),
           const SizedBox(height: 14),
           ApexCard(
             glow: true,
@@ -445,11 +596,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 const SizedBox(height: 14),
-                ApexTrendChart(
-                  values: weeklyVolume,
-                  labels: _buildDayLabels(7),
-                  color: ApexColors.blue,
-                  height: 166,
+                RepaintBoundary(
+                  child: ApexTrendChart(
+                    values: weeklyVolume,
+                    labels: _buildDayLabels(7),
+                    color: ApexColors.blue,
+                    height: 166,
+                  ),
                 ),
               ],
             ),
@@ -482,17 +635,27 @@ class _HomeScreenState extends State<HomeScreen> {
                 'Time',
                 ApexColors.purple,
               ),
-              _miniStat(
-                Icons.directions_walk_rounded,
-                _loading ? '—' : '$_steps',
-                'Steps',
-                ApexColors.orange,
+              ValueListenableBuilder<int>(
+                valueListenable: _stepsNotifier,
+                builder: (context, val, _) {
+                  return _miniStat(
+                    Icons.directions_run_rounded,
+                    _loading ? '—' : '$val',
+                    'Steps',
+                    ApexColors.accent,
+                  );
+                },
               ),
-              _miniStat(
-                Icons.local_fire_department_rounded,
-                _loading ? '—' : '${_activeEnergy.toStringAsFixed(0)} kcal',
-                'Energy',
-                ApexColors.red,
+              ValueListenableBuilder<double>(
+                valueListenable: _energyNotifier,
+                builder: (context, val, _) {
+                  return _miniStat(
+                    Icons.bolt_rounded,
+                    _loading ? '—' : '${val.round()}',
+                    'Energy',
+                    ApexColors.orange,
+                  );
+                },
               ),
             ],
           ),
@@ -941,16 +1104,14 @@ class _HomeScreenState extends State<HomeScreen> {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: stages
-                    .map(
-                      (stage) => Padding(
-                        padding: EdgeInsets.only(
-                          right: stage == stages.last ? 0 : 10,
-                        ),
-                        child: _journeyStageCard(stage),
-                      ),
-                    )
-                    .toList(),
+                children: stages.map((stage) {
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      right: stage == stages.last ? 0 : 10,
+                    ),
+                    child: _journeyStageCard(stage),
+                  );
+                }).toList(),
               ),
             ),
         ],
@@ -962,83 +1123,87 @@ class _HomeScreenState extends State<HomeScreen> {
     final photoData = stage.photo?['photo_data']?.toString();
     final dateLabel = _formatLongDate(stage.photo?['taken_at']?.toString());
 
-    return Container(
-      width: 152,
-      decoration: BoxDecoration(
-        color: ApexColors.surfaceStrong,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: ApexColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(23)),
-            child: SizedBox(
-              height: 172,
-              width: double.infinity,
-              child: photoData == null
-                  ? DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: stage.color.withAlpha(12),
-                      ),
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.add_photo_alternate_outlined,
-                              color: stage.color,
-                              size: 26,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Add photo',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: ApexColors.t2,
-                              ),
-                            ),
-                          ],
+    return InkWell(
+      onTap: _showAddPhotoSource,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        width: 152,
+        decoration: BoxDecoration(
+          color: ApexColors.surfaceStrong,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: ApexColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(23)),
+              child: SizedBox(
+                height: 172,
+                width: double.infinity,
+                child: photoData == null
+                    ? DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: stage.color.withAlpha(12),
                         ),
-                      ),
-                    )
-                  : _buildPhoto(photoData),
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.add_photo_alternate_outlined,
+                                color: stage.color,
+                                size: 26,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Add photo',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: ApexColors.t2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : _buildPhoto(photoData),
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  stage.label.toUpperCase(),
-                  style: GoogleFonts.inter(
-                    fontSize: 10,
-                    color: ApexColors.t3,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    stage.label.toUpperCase(),
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      color: ApexColors.t3,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  stage.dayLabel,
-                  style: ApexTheme.mono(size: 16, color: stage.color),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  photoData == null ? 'Capture this milestone.' : dateLabel,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: ApexColors.t2,
-                    height: 1.45,
+                  const SizedBox(height: 6),
+                  Text(
+                    stage.dayLabel,
+                    style: ApexTheme.mono(size: 16, color: stage.color),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    photoData == null ? 'Capture this milestone.' : dateLabel,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: ApexColors.t2,
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

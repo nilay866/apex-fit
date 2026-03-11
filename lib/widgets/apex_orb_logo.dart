@@ -160,18 +160,16 @@ class _ApexOrbLogoState extends State<ApexOrbLogo>
       },
     );
 
-    if (widget.onTap == null) {
-      return orb;
-    }
-
     return GestureDetector(
       onTap: widget.onTap,
-      child: orb,
+      child: RepaintBoundary(child: orb),
     );
   }
 
   Widget _imageWidget(String initials) {
     final imageData = widget.imageData;
+    final int cacheSize = (widget.size * MediaQuery.of(context).devicePixelRatio).round();
+    
     if (imageData != null && imageData.isNotEmpty) {
       if (imageData.startsWith('data:')) {
         final base64String = imageData.split(',').last;
@@ -181,6 +179,8 @@ class _ApexOrbLogoState extends State<ApexOrbLogo>
             decoded, 
             fit: BoxFit.cover,
             gaplessPlayback: true,
+            cacheWidth: cacheSize,
+            cacheHeight: cacheSize,
             errorBuilder: (context, error, stackTrace) => _initialsWidget(initials),
           );
         } catch (e) {
@@ -192,6 +192,8 @@ class _ApexOrbLogoState extends State<ApexOrbLogo>
           imageData, 
           fit: BoxFit.cover,
           gaplessPlayback: true,
+          cacheWidth: cacheSize,
+          cacheHeight: cacheSize,
           errorBuilder: (context, error, stackTrace) => _initialsWidget(initials),
         );
       }

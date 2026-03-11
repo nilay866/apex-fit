@@ -30,6 +30,9 @@ dependencies:
   google_maps_flutter: ^2.5.3
   geolocator: ^11.0.1
   live_activities: ^2.4.7
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^3.5.2
+  fuzzy: ^0.5.1
 
 dev_dependencies:
   flutter_test:

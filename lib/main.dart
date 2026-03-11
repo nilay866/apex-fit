@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'constants/app_config.dart';
@@ -46,20 +47,22 @@ class _ApexAIAppState extends State<ApexAIApp> {
       if (!AppConfig.hasSupabase) {
         throw Exception('AppConfig is missing Supabase settings.');
       }
-      await SupabaseService.init(AppConfig.supabaseUrl, AppConfig.supabaseAnonKey);
-      if (AppConfig.hasGemini) {
-        AIService.init(AppConfig.geminiApiKey);
-      }
+      
+      // Parallelize heavy initialization
+      await Future.wait([
+        SupabaseService.init(AppConfig.supabaseUrl, AppConfig.supabaseAnonKey),
+        if (AppConfig.hasGemini) Future.microtask(() => AIService.init(AppConfig.geminiApiKey)),
+      ]);
 
       if (SupabaseService.currentUser != null) {
         setState(() => _state = AppState.home);
-        // Fire and forget sync mechanism
-        SupabaseService.syncOfflineWorkouts();
+        // Decentralized fire-and-forget sync
+        unawaited(SupabaseService.syncOfflineWorkouts());
       } else {
         setState(() => _state = AppState.auth);
       }
     } catch (e) {
-      setState(() => _state = AppState.auth);
+      if (mounted) setState(() => _state = AppState.auth);
     }
   }
 
