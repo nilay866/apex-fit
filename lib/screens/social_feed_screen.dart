@@ -374,7 +374,12 @@ class _CommunityAddModalState extends State<_CommunityAddModal> {
   @override
   Widget build(BuildContext context) {
     final me = SupabaseService.currentUser!;
-    final qrData = jsonEncode({'id': me.id, 'name': me.email?.split('@')[0] ?? 'User'});
+    final athleteCode = me.id.substring(0, 8).toUpperCase();
+    final qrData = jsonEncode({
+      'id': me.id, 
+      'code': athleteCode,
+      'name': me.email?.split('@')[0] ?? 'User'
+    });
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
@@ -415,11 +420,21 @@ class _CommunityAddModalState extends State<_CommunityAddModal> {
                           data: qrData,
                           version: QrVersions.auto,
                           size: 160.0,
-                          eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: ApexColors.ink),
-                          dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: ApexColors.ink),
+                          eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: ApexColors.t1),
+                          dataModuleStyle: const QrDataModuleStyle(dataModuleShape: QrDataModuleShape.square, color: ApexColors.t1),
                         ),
                       ),
                       const SizedBox(height: 16),
+                      Text(
+                        athleteCode,
+                        style: GoogleFonts.inter(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 4,
+                          color: ApexColors.t1,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
                       Text('Show this to a peer in the gym to connect instantly.', textAlign: TextAlign.center, style: TextStyle(color: ApexColors.t2, fontSize: 12)),
                     ],
                   ),

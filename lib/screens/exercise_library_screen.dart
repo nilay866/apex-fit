@@ -32,16 +32,17 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final res = await SupabaseService.getExerciseDictionary(
-      muscleGroup: _selectedMuscle,
+    // Use the new Intelligence System method
+    final res = await SupabaseService.getExercises(
+      muscle: _selectedMuscle,
       environment: _selectedEnv,
       equipment: _selectedEquipment,
     );
     if (mounted) {
       setState(() {
-      _exercises = res;
-      _loading = false;
-    });
+        _exercises = res;
+        _loading = false;
+      });
     }
   }
 
@@ -73,13 +74,36 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
       ),
       body: Column(
         children: [
+          // Search & Filter Bar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: TextField(
+              style: const TextStyle(color: ApexColors.t1),
+              decoration: InputDecoration(
+                hintText: 'Search exercises...',
+                hintStyle: TextStyle(color: ApexColors.t3),
+                prefixIcon: const Icon(Icons.search, color: ApexColors.t3),
+                filled: true,
+                fillColor: ApexColors.surface,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: ApexColors.border)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: ApexColors.border)),
+              ),
+              onChanged: (val) {
+                // Implement local search for instant feedback
+                setState(() {
+                  _exercises = _exercises.where((e) => (e['name'] ?? '').toString().toLowerCase().contains(val.toLowerCase())).toList();
+                });
+                if (val.isEmpty) _load();
+              },
+            ),
+          ),
+
           // 3D Anatomical Body Selector Mock (Filter chips for now)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            padding: const EdgeInsets.only(bottom: 24, left: 16, right: 16),
             decoration: const BoxDecoration(
-              color: ApexColors.surface,
-              border: Border(bottom: BorderSide(color: ApexColors.border)),
+              color: ApexColors.bg,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
