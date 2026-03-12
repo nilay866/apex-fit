@@ -6,6 +6,8 @@ import '../constants/theme.dart';
 import '../widgets/apex_button.dart';
 import '../services/supabase_service.dart';
 import '../services/storage_service.dart';
+import '../services/adaptive_logic.dart';
+import '../workout_engine/plate_calculator.dart';
 import 'package:flutter/services.dart';
 
 class ActiveWorkoutScreen extends StatefulWidget {
@@ -32,22 +34,81 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   String _intensity = 'moderate';
   bool _saving = false;
   bool _showEnd = false;
-  Timer? _tRef;
   Timer? _rRef;
+  Timer? _tRef;
+  String? _smartTip;
 
   @override
   void initState() {
     super.initState();
     _loadPrevious();
+    
     final exList = (widget.workout['exercises'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     _exercises = exList;
+    
+    // Initialize default logs
     for (int i = 0; i < exList.length; i++) {
       final sets = (exList[i]['sets'] as int?) ?? 3;
       final repsStr = exList[i]['reps']?.toString().split('-')[0] ?? '8';
       final tw = exList[i]['target_weight']?.toString() ?? '';
       _logs[i] = List.generate(sets, (_) => {'reps': repsStr, 'weight': tw, 'done': false, 'type': 'normal'});
     }
-    _tRef = Timer.periodic(const Duration(seconds: 1), (_) => setState(() => _timer++));
+
+    _checkRecoveredState();
+
+    _tRef = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() => _timer++);
+        if (_timer % 10 == 0) _saveState(); // Auto-save every 10s
+      }
+    });
+  }
+
+  Future<void> _checkRecoveredState() async {
+    try {
+      final state = await StorageService.loadActiveWorkoutState();
+      if (state != null && state['workout_name'] == widget.workout['name']) {
+        // Simple heuristic: only recover if it's the same workout and within the last 2 hours
+        final savedAt = state['savedAt'] as int? ?? 0;
+        final now = DateTime.now().millisecondsSinceEpoch;
+        if (now - savedAt < 1000 * 60 * 60 * 2) {
+          if (mounted) {
+            setState(() {
+              _timer = state['timer'] as int? ?? 0;
+              _cur = state['cur'] as int? ?? 0;
+              state['logs']?.forEach((k, v) {
+                _logs[int.parse(k.toString())] = List<Map<String, dynamic>>.from(v as List);
+              });
+              state['exNotes']?.forEach((k, v) {
+                _exNotes[int.parse(k.toString())] = v as String;
+              });
+              _notes = state['notes'] as String? ?? '';
+              _intensity = state['intensity'] as String? ?? 'moderate';
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Recovered previous session progress.'), backgroundColor: ApexColors.accent),
+            );
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveState() async {
+    if (_saving) return;
+    try {
+      final state = {
+        'workout_name': widget.workout['name'],
+        'timer': _timer,
+        'cur': _cur,
+        'logs': _logs.map((k, v) => MapEntry(k.toString(), v)),
+        'exNotes': _exNotes.map((k, v) => MapEntry(k.toString(), v)),
+        'notes': _notes,
+        'intensity': _intensity,
+        'savedAt': DateTime.now().millisecondsSinceEpoch,
+      };
+      await StorageService.saveActiveWorkoutState(state);
+    } catch (_) {}
   }
 
   Future<void> _loadPrevious() async {
@@ -56,7 +117,31 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         SupabaseService.currentUser!.id,
         widget.workout['name'] ?? '',
       );
-      if (mounted) setState(() => _previousSets = pSets);
+      if (mounted) {
+        setState(() {
+          _previousSets = pSets;
+          // After loading previous sets, apply AI recommendations to initial logs
+          for (int i = 0; i < _exercises.length; i++) {
+            final exName = _exercises[i]['name'];
+            final exPSets = pSets.where((ps) => ps['exercise_name'] == exName).toList();
+            if (exPSets.isNotEmpty) {
+              final rec = AdaptiveLogic.recommendNextSession(
+                previousSets: exPSets,
+                intensity: 'moderate', // Default assumption
+              );
+              if (rec.containsKey('weight')) {
+                final recW = rec['weight'].toString();
+                // Update only sets that haven't been touched yet
+                for (var s in _logs[i]!) {
+                  if (s['done'] == false && (s['weight'] == null || s['weight'] == '' || s['weight'] == _exercises[i]['target_weight']?.toString())) {
+                    s['weight'] = recW;
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
     } catch (_) {}
   }
 
@@ -114,11 +199,29 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     });
     final s = _logs[_cur]![si];
     if (!(s['done'] as bool? ?? false)) return;
+    
+    // Phase 15: AI Live Adjustment
+    final targetReps = 8; // Default or from exercise meta
+    final actualReps = int.tryParse(s['reps']?.toString() ?? '0') ?? 0;
+    final suggest = AdaptiveLogic.getLiveAdjustmentSuggest(
+      setNumber: si + 1,
+      setType: s['type'] ?? 'normal',
+      actualReps: actualReps,
+      targetReps: targetReps,
+    );
+    if (suggest != null) {
+      setState(() => _smartTip = suggest);
+      Future.delayed(const Duration(seconds: 8), () {
+        if (mounted) setState(() => _smartTip = null);
+      });
+    }
+
     if (s['type'] != 'drop') _startRest();
   }
 
   void _upd(int ei, int si, String f, String v) {
     setState(() => _logs[ei]![si][f] = v);
+    _saveState();
   }
 
   void _addSet(int ei) {
@@ -126,6 +229,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       final last = _logs[ei]!.last;
       _logs[ei]!.add({'reps': '8', 'weight': last['weight'] ?? '', 'done': false, 'type': 'normal'});
     });
+    _saveState();
   }
 
   int get _totalVol => _logs.values.expand((e) => e).where((s) => s['done'] == true)
@@ -180,6 +284,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         s['log_id'] = log['id'];
       }
       await SupabaseService.createSetLogs(sets);
+      await StorageService.clearActiveWorkoutState();
     } catch (e) {
       try {
         await StorageService.saveOfflineWorkout(payload);
@@ -362,6 +467,29 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               ),
             ),
             Divider(color: ApexColors.border, height: 1),
+            
+            if (_smartTip != null)
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: ApexColors.accent.withAlpha(20),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: ApexColors.accent.withAlpha(50)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.psychology_rounded, color: ApexColors.accent, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _smartTip!,
+                        style: TextStyle(color: ApexColors.t1, fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
             // Set logging
             Expanded(
@@ -389,40 +517,49 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                           final prevSet = _previousSets.where((ps) => 
                             ps['exercise_name'] == ex['name'] && ps['set_number'] == (si + 1)
                           ).firstOrNull;
-                          final pReps = prevSet?['reps_done']?.toString() ?? '0';
-                          final pWeight = prevSet?['weight_kg']?.toString() ?? '0';
+                          final pReps = prevSet?['reps_done']?.toString() ?? '';
+                          final pWeight = prevSet?['weight_kg']?.toString() ?? '';
 
-                          String tLabel = '${si + 1}';
                           final tVal = s['type'] as String? ?? 'normal';
-                          if (tVal == 'warmup') {
-                            tLabel = 'W';
-                          } else if (tVal == 'drop') {
-                            tLabel = 'D';
-                          } else if (tVal == 'failure') {
-                            tLabel = 'F';
-                          }
+                          
+                          // Color-coded type badge
+                          final (tLabel, tColor) = switch (tVal) {
+                            'warmup' => ('W', ApexColors.yellow),
+                            'drop'   => ('D', ApexColors.blue),
+                            'failure'=> ('F', ApexColors.red),
+                            _        => ('${si + 1}', ApexColors.t3),
+                          };
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 7),
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: done ? ApexColors.accentDim : ApexColors.card,
-                              border: Border.all(color: done ? ApexColors.accent.withAlpha(64) : ApexColors.border),
+                              border: Border.all(color: done ? ApexColors.accent.withAlpha(64) : (tVal == 'warmup' ? ApexColors.yellow.withAlpha(60) : tVal == 'drop' ? ApexColors.blue.withAlpha(60) : ApexColors.border)),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Row(
                               children: [
+                                // Type badge — tap to cycle
                                 SizedBox(
                                   width: 34,
                                   child: GestureDetector(
                                     onTap: () => _toggleType(_cur, si),
                                     child: Container(
                                       width: 26, height: 26,
-                                      decoration: BoxDecoration(color: done ? ApexColors.accent : ApexColors.surface, shape: BoxShape.circle),
-                                      child: Center(child: Text(done ? '✓' : tLabel, style: TextStyle(color: done ? ApexColors.bg : (tVal != 'normal' ? ApexColors.accent : ApexColors.t3), fontWeight: FontWeight.w800, fontSize: 11))),
+                                      decoration: BoxDecoration(
+                                        color: done ? ApexColors.accent : tColor.withAlpha(28),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: done ? ApexColors.accent : tColor.withAlpha(100)),
+                                      ),
+                                      child: Center(child: Text(
+                                        done ? '✓' : tLabel,
+                                        style: TextStyle(color: done ? ApexColors.bg : tColor, fontWeight: FontWeight.w800, fontSize: 11),
+                                      )),
                                     ),
                                   ),
                                 ),
+                                // Reps field
                                 Expanded(
                                   child: TextField(
                                     controller: TextEditingController(text: s['reps']?.toString() ?? ''),
@@ -432,8 +569,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                                     textAlign: TextAlign.center,
                                     style: ApexTheme.mono(size: 16),
                                     decoration: InputDecoration(
-                                      hintText: pReps,
-                                      hintStyle: ApexTheme.mono(size: 16, color: ApexColors.t3.withValues(alpha: 0.4)),
+                                      hintText: pReps.isNotEmpty ? '$pReps' : '0',
+                                      hintStyle: ApexTheme.mono(size: 14, color: ApexColors.t3.withValues(alpha: 0.5)),
                                       contentPadding: const EdgeInsets.symmetric(vertical: 8),
                                       filled: true, fillColor: ApexColors.surface,
                                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(7), borderSide: BorderSide(color: ApexColors.border)),
@@ -441,20 +578,28 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 6),
+                                // Weight field with plate calculator on long-press
                                 Expanded(
-                                  child: TextField(
-                                    controller: TextEditingController(text: s['weight']?.toString() ?? ''),
-                                    onChanged: (v) => _upd(_cur, si, 'weight', v),
-                                    onTap: () => setState(() { _focusedEx = _cur; _focusedSet = si; }),
-                                    keyboardType: TextInputType.number,
-                                    textAlign: TextAlign.center,
-                                    style: ApexTheme.mono(size: 16),
-                                    decoration: InputDecoration(
-                                      hintText: pWeight,
-                                      hintStyle: ApexTheme.mono(size: 16, color: ApexColors.t3.withValues(alpha: 0.4)),
-                                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                                      filled: true, fillColor: ApexColors.surface,
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(7), borderSide: BorderSide(color: ApexColors.border)),
+                                  child: GestureDetector(
+                                    onLongPress: () {
+                                      HapticFeedback.mediumImpact();
+                                      final currentW = double.tryParse(s['weight']?.toString() ?? '0') ?? 0;
+                                      showPlateCalculator(context, initialWeight: currentW > 0 ? currentW : 60);
+                                    },
+                                    child: TextField(
+                                      controller: TextEditingController(text: s['weight']?.toString() ?? ''),
+                                      onChanged: (v) => _upd(_cur, si, 'weight', v),
+                                      onTap: () => setState(() { _focusedEx = _cur; _focusedSet = si; }),
+                                      keyboardType: TextInputType.number,
+                                      textAlign: TextAlign.center,
+                                      style: ApexTheme.mono(size: 16),
+                                      decoration: InputDecoration(
+                                        hintText: pWeight.isNotEmpty ? '$pWeight' : '0',
+                                        hintStyle: ApexTheme.mono(size: 14, color: ApexColors.t3.withValues(alpha: 0.5)),
+                                        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                                        filled: true, fillColor: ApexColors.surface,
+                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(7), borderSide: BorderSide(color: ApexColors.border)),
+                                      ),
                                     ),
                                   ),
                                 ),
