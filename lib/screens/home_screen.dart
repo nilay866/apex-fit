@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -15,6 +16,10 @@ import '../services/ai_service.dart';
 import '../services/health_service.dart';
 import '../services/supabase_service.dart';
 import '../services/cache_service.dart';
+import '../services/achievement_service.dart';
+import '../widgets/achievement_badges.dart';
+import 'workout_programs_screen.dart';
+
 
 class HomeScreen extends StatefulWidget {
   final Map<String, dynamic>? profile;
@@ -33,6 +38,9 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _waterLogs = [];
   List<Map<String, dynamic>> _bwLogs = [];
   List<Map<String, dynamic>> _photos = [];
+  List<Map<String, dynamic>> _enrollments = [];
+  List<Achievement> _unlockedAchievements = [];
+
 
   // Statistical Notifiers for surgical UI updates
   late final ValueNotifier<int> _waterNotifier;
@@ -60,6 +68,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _stepsNotifier = ValueNotifier<int>(0);
     _energyNotifier = ValueNotifier<double>(0.0);
     _calorieNotifier = ValueNotifier<int>(0);
+
+    // Phase 14: Background Sync Trigger
+    SupabaseService.syncOfflineWorkouts();
+    Timer.periodic(const Duration(minutes: 5), (_) => SupabaseService.syncOfflineWorkouts());
 
     _load();
   }
@@ -94,7 +106,9 @@ class _HomeScreenState extends State<HomeScreen> {
         SupabaseService.getBodyWeightLogs(userId, limit: 3),
         SupabaseService.getProgressPhotos(userId),
         SupabaseService.getWaterLogs(userId, since: DateTime.parse('${todayStr}T00:00:00')),
+        SupabaseService.getUserEnrollments(userId),
       ]);
+
       
       final healthData = await HealthService.fetchDailySummary();
 
@@ -108,7 +122,13 @@ class _HomeScreenState extends State<HomeScreen> {
         _bwLogs = results[3];
         _photos = results[4];
         _waterLogs = results[5];
+        _enrollments = (results.length > 6) ? results[6] as List<Map<String, dynamic>> : [];
         _loading = false;
+
+        // Calculate Achievements
+        AchievementService.checkAchievements(_logs, _streak).then((achievements) {
+          if (mounted) setState(() => _unlockedAchievements = achievements);
+        });
         
         // Update notifiers without triggering full rebuild
         _waterNotifier.value = _calculateTotalWater(_waterLogs);
@@ -449,6 +469,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 14),
           ],
+          _buildProgramsCard(),
+          const SizedBox(height: 14),
+
           ApexCard(
             glow: true,
             glowColor: ApexColors.purple,
@@ -1451,7 +1474,83 @@ class _HomeScreenState extends State<HomeScreen> {
       return 'Saved photo';
     }
   }
+  Widget _buildProgramsCard() {
+    if (_enrollments.isEmpty) {
+      return GestureDetector(
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WorkoutProgramsScreen())),
+        child: ApexCard(
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: ApexColors.accent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.auto_graph_rounded, color: ApexColors.accent),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('structured programs'.toUpperCase(), style: TextStyle(color: ApexColors.t3, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                    const SizedBox(height: 4),
+                    Text('Accelerate your results', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16, color: ApexColors.t1)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: ApexColors.t3),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final active = _enrollments.first;
+    final program = active['workout_programs'];
+    final day = active['current_day'] ?? 1;
+
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WorkoutProgramsScreen())),
+      child: ApexCard(
+        glow: true,
+        glowColor: ApexColors.accent,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('ACTIVE PROGRAM', style: TextStyle(color: ApexColors.t3, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                    const SizedBox(height: 4),
+                    Text(program?['name'] ?? 'Training Program', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 20, color: ApexColors.t1)),
+                  ],
+                ),
+                ApexTag(text: 'DAY $day', color: ApexColors.accent),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: LinearProgressIndicator(
+                value: day / ((program?['duration_weeks'] ?? 4) * 7),
+                minHeight: 6,
+                backgroundColor: ApexColors.cardAlt,
+                valueColor: const AlwaysStoppedAnimation(ApexColors.accent),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+
 
 class _JourneyPhotoStage {
   final String label;
