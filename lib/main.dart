@@ -6,6 +6,8 @@ import 'constants/theme.dart';
 import 'constants/colors.dart';
 import 'services/supabase_service.dart';
 import 'services/ai_service.dart';
+import 'services/exercise_animation_service.dart';
+import 'services/storage_service.dart';
 import 'screens/auth_screen.dart';
 import 'screens/main_shell.dart';
 import 'widgets/apex_backdrop.dart';
@@ -13,13 +15,15 @@ import 'widgets/apex_orb_logo.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.dark,
-    statusBarBrightness: Brightness.light,
-    systemNavigationBarColor: ApexColors.bg,
-    systemNavigationBarIconBrightness: Brightness.dark,
-  ));
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+      systemNavigationBarColor: ApexColors.bg,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(const ApexAIApp());
 }
@@ -47,11 +51,12 @@ class _ApexAIAppState extends State<ApexAIApp> {
       if (!AppConfig.hasSupabase) {
         throw Exception('AppConfig is missing Supabase settings.');
       }
-      
+
       // Parallelize heavy initialization
       await Future.wait([
         SupabaseService.init(AppConfig.supabaseUrl, AppConfig.supabaseAnonKey),
-        if (AppConfig.hasGemini) Future.microtask(() => AIService.init(AppConfig.geminiApiKey)),
+        _initAI(),
+        _initExerciseAnimations(),
       ]);
 
       if (SupabaseService.currentUser != null) {
@@ -64,6 +69,27 @@ class _ApexAIAppState extends State<ApexAIApp> {
     } catch (e) {
       if (mounted) setState(() => _state = AppState.auth);
     }
+  }
+
+  Future<void> _initAI() async {
+    final provider = await StorageService.loadAIProvider();
+    if (provider == 'bedrock') {
+      final aws = await StorageService.loadAWSConfig();
+      if (aws != null) {
+        AIService.useBedrock(modelId: aws['modelId']);
+        return;
+      }
+    }
+
+    // Default to Gemini
+    if (AppConfig.hasGemini) {
+      AIService.useGemini(AppConfig.geminiApiKey);
+    }
+  }
+
+  Future<void> _initExerciseAnimations() async {
+    final key = await StorageService.loadExerciseApiKey();
+    ExerciseAnimationService.setApiKey(key);
   }
 
   void _onAuth() {

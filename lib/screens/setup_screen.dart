@@ -7,7 +7,12 @@ import '../widgets/apex_button.dart';
 import '../services/ai_service.dart';
 
 class SetupScreen extends StatefulWidget {
-  final Function(String url, String key, String aiKey) onConnect;
+  final Function({
+    required String url,
+    required String key,
+    required String aiKey,
+    String? rapidApiKey,
+  }) onConnect;
   const SetupScreen({super.key, required this.onConnect});
 
   @override
@@ -18,6 +23,7 @@ class _SetupScreenState extends State<SetupScreen> {
   final _urlC = TextEditingController();
   final _keyC = TextEditingController();
   final _aiKeyC = TextEditingController();
+  final _rapidC = TextEditingController();
   bool _showSql = false;
   bool _copied = false;
   String _err = '';
@@ -98,7 +104,7 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
     }
     setState(() { _testingAi = true; _aiResult = null; });
     try {
-      final ok = await AIService.testConnection(_aiKeyC.text.trim());
+      final ok = await AIService.testConnection();
       setState(() => _aiResult = ok
           ? {'ok': true, 'msg': '✅ Gemini AI working!'}
           : {'ok': false, 'msg': '❌ Invalid API key'});
@@ -109,19 +115,11 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
     }
   }
 
-  void _launch() {
-    if (_urlC.text.isEmpty || _keyC.text.isEmpty) {
-      setState(() => _err = 'Supabase URL and key required.');
-      return;
-    }
-    if (_aiKeyC.text.trim().isEmpty) {
-      setState(() => _err = 'Gemini API key required for AI features.');
-      return;
-    }
     widget.onConnect(
-      _urlC.text.trim().replaceAll(RegExp(r'/$'), ''),
-      _keyC.text.trim(),
-      _aiKeyC.text.trim(),
+      url: _urlC.text.trim().replaceAll(RegExp(r'/$'), ''),
+      key: _keyC.text.trim(),
+      aiKey: _aiKeyC.text.trim(),
+      rapidApiKey: _rapidC.text.trim().isNotEmpty ? _rapidC.text.trim() : null,
     );
   }
 
@@ -130,6 +128,7 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
     _urlC.dispose();
     _keyC.dispose();
     _aiKeyC.dispose();
+    _rapidC.dispose();
     super.dispose();
   }
 

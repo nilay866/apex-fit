@@ -1,30 +1,22 @@
-import 'package:google_generative_ai/google_generative_ai.dart';
 import 'dart:convert';
+import 'ai/ai_provider.dart';
+import 'ai/gemini_provider.dart';
+import 'ai/bedrock_provider.dart';
 
 class AIService {
-  static GenerativeModel? _model;
+  static AIProvider? _activeProvider;
 
-  static void init(String apiKey) {
-    _model = GenerativeModel(
-      model: 'gemini-2.0-flash',
-      apiKey: apiKey,
-    );
+  static void useGemini(String apiKey) {
+    _activeProvider = GeminiProvider(apiKey);
+  }
+
+  static void useBedrock({String? modelId}) {
+    _activeProvider = BedrockProvider(modelId: modelId);
   }
 
   static Future<String> generate(String prompt) async {
-    if (_model == null) throw Exception('AI is not configured for this build');
-    try {
-      final response = await _model!.generateContent([Content.text(prompt)]);
-      return response.text ?? '';
-    } catch (e) {
-      if (e.toString().contains('429')) {
-        throw Exception('Rate limit — wait a moment and retry');
-      }
-      if (e.toString().contains('API key')) {
-        throw Exception('Invalid Gemini API key — check at aistudio.google.com');
-      }
-      throw Exception('AI error: $e');
-    }
+    if (_activeProvider == null) throw Exception('AI is not configured. Go to Settings.');
+    return await _activeProvider!.generate(prompt);
   }
 
   static Map<String, dynamic> _extractJson(String raw) {
@@ -99,13 +91,8 @@ Recent: ${recentLogs.isNotEmpty ? recentLogs.join(', ') : 'none'}''';
     return await generate('$system\n\n---\n$history\nCoach:');
   }
 
-  static Future<bool> testConnection(String apiKey) async {
-    try {
-      final testModel = GenerativeModel(model: 'gemini-2.0-flash', apiKey: apiKey);
-      final response = await testModel.generateContent([Content.text('Reply with exactly: APEX AI ready')]);
-      return response.text != null && response.text!.isNotEmpty;
-    } catch (e) {
-      return false;
-    }
+  static Future<bool> testConnection() async {
+    if (_activeProvider == null) return false;
+    return await _activeProvider!.testConnection();
   }
 }

@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:async';
 
 class StorageService {
   static const _cfgKey = 'apexcfg_v4';
@@ -11,7 +12,10 @@ class StorageService {
     required String aiKey,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_cfgKey, jsonEncode({'url': url, 'key': key, 'aiKey': aiKey}));
+    await prefs.setString(
+      _cfgKey,
+      jsonEncode({'url': url, 'key': key, 'aiKey': aiKey}),
+    );
   }
 
   static Future<Map<String, dynamic>?> loadConfig() async {
@@ -30,15 +34,18 @@ class StorageService {
     Map<String, dynamic>? profile,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_ssKey, jsonEncode({
-      'user': user,
-      'token': token,
-      'refreshToken': refreshToken,
-      'name': name,
-      'goal': goal,
-      'profile': profile ?? {},
-      'savedAt': DateTime.now().millisecondsSinceEpoch,
-    }));
+    await prefs.setString(
+      _ssKey,
+      jsonEncode({
+        'user': user,
+        'token': token,
+        'refreshToken': refreshToken,
+        'name': name,
+        'goal': goal,
+        'profile': profile ?? {},
+        'savedAt': DateTime.now().millisecondsSinceEpoch,
+      }),
+    );
   }
 
   static Future<Map<String, dynamic>?> loadSession() async {
@@ -50,7 +57,9 @@ class StorageService {
 
   static const _offlineLogsKey = 'apex_offline_workouts_v1';
 
-  static Future<void> saveOfflineWorkout(Map<String, dynamic> workoutPayload) async {
+  static Future<void> saveOfflineWorkout(
+    Map<String, dynamic> workoutPayload,
+  ) async {
     final prefs = await SharedPreferences.getInstance();
     final existing = prefs.getString(_offlineLogsKey);
     List<dynamic> logs = [];
@@ -76,10 +85,86 @@ class StorageService {
     await prefs.remove(_offlineLogsKey);
   }
 
+  static const _activeWorkoutKey = 'apex_active_workout_v1';
+  static const _awsCfgKey = 'apex_aws_v1';
+  static const _aiProviderKey = 'apex_ai_provider_v1';
+  static const _exerciseApiKey = 'apex_exercise_api_key_v1';
+
+  static Future<void> saveAWSConfig({
+    required String accessKey,
+    required String secretKey,
+    required String region,
+    String? modelId,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _awsCfgKey,
+      jsonEncode({
+        'accessKey': accessKey,
+        'secretKey': secretKey,
+        'region': region,
+        'modelId': modelId ?? 'anthropic.claude-3-haiku-20240307-v1:0',
+      }),
+    );
+  }
+
+  static Future<Map<String, dynamic>?> loadAWSConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+    final s = prefs.getString(_awsCfgKey);
+    if (s == null) return null;
+    return jsonDecode(s) as Map<String, dynamic>;
+  }
+
+  static Future<void> saveAIProvider(String provider) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_aiProviderKey, provider);
+  }
+
+  static Future<String> loadAIProvider() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_aiProviderKey) ?? 'bedrock';
+  }
+
+  static Future<void> saveExerciseApiKey(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    final trimmed = key.trim();
+    if (trimmed.isEmpty) {
+      await prefs.remove(_exerciseApiKey);
+      return;
+    }
+    await prefs.setString(_exerciseApiKey, trimmed);
+  }
+
+  static Future<String> loadExerciseApiKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_exerciseApiKey) ?? '';
+  }
+
+  static Future<void> saveActiveWorkoutState(Map<String, dynamic> state) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_activeWorkoutKey, jsonEncode(state));
+  }
+
+  static Future<Map<String, dynamic>?> loadActiveWorkoutState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final s = prefs.getString(_activeWorkoutKey);
+    if (s == null) return null;
+    return jsonDecode(s) as Map<String, dynamic>;
+  }
+
+  static Future<void> clearActiveWorkoutState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_activeWorkoutKey);
+  }
+
   static Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_cfgKey);
     await prefs.remove(_ssKey);
     await prefs.remove(_offlineLogsKey);
+    await prefs.remove(_activeWorkoutKey);
+    await prefs.remove(_awsCfgKey);
+    await prefs.remove(_aiProviderKey);
+    await prefs.remove(_exerciseApiKey);
   }
 }
