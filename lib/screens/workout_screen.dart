@@ -9,6 +9,7 @@ import '../widgets/apex_screen_header.dart';
 import '../widgets/apex_tag.dart';
 import '../services/supabase_service.dart';
 import 'exercise_library_screen.dart';
+import '../routine_system/routine_library_screen.dart';
 
 class WorkoutScreen extends StatefulWidget {
   final Function(Map<String, dynamic>) onStartWorkout;
@@ -88,23 +89,47 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
               title: 'Workouts',
               subtitle:
                   '${_workouts.length} saved workout plans ready to start.',
-              trailing: GestureDetector(
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ExerciseLibraryScreen()));
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(color: ApexColors.cardAlt, borderRadius: BorderRadius.circular(16)),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.menu_book_rounded, color: ApexColors.accent, size: 16),
-                      const SizedBox(width: 6),
-                      Text('Library', style: GoogleFonts.inter(color: ApexColors.t1, fontSize: 12, fontWeight: FontWeight.w700)),
-                    ],
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const RoutineLibraryScreen()));
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(color: ApexColors.cardAlt, borderRadius: BorderRadius.circular(16)),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.list_alt_rounded, color: ApexColors.purple, size: 16),
+                          const SizedBox(width: 6),
+                          Text('Routines', style: GoogleFonts.inter(color: ApexColors.t1, fontSize: 12, fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ExerciseLibraryScreen()));
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(color: ApexColors.cardAlt, borderRadius: BorderRadius.circular(16)),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.menu_book_rounded, color: ApexColors.accent, size: 16),
+                          const SizedBox(width: 6),
+                          Text('Library', style: GoogleFonts.inter(color: ApexColors.t1, fontSize: 12, fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 18),
