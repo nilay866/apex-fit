@@ -1,16 +1,17 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:haptic_feedback/haptic_feedback.dart';
 import '../constants/colors.dart';
-import '../services/supabase_service.dart';
+import '../repositories/auth_repository.dart';
+import '../repositories/profile_repository.dart';
+import '../repositories/workout_repository.dart';
 import '../widgets/apex_backdrop.dart';
 import '../widgets/apex_orb_logo.dart';
 import '../widgets/profile_modal.dart';
 import 'active_workout_screen.dart';
 import 'home_screen.dart';
-import 'nutrition_screen.dart';
+
 import 'social_feed_screen.dart';
 import 'reports_screen.dart';
 import 'workout_screen.dart';
@@ -42,7 +43,6 @@ class _MainShellState extends State<MainShell> {
     {'icon': Icons.home_rounded, 'label': 'Home'},
     {'icon': Icons.fitness_center_rounded, 'label': 'Train'},
     {'icon': Icons.public_rounded, 'label': 'Social'},
-    {'icon': Icons.restaurant_menu_rounded, 'label': 'Fuel'},
     {'icon': Icons.bar_chart_rounded, 'label': 'Stats'},
   ];
 
@@ -60,12 +60,14 @@ class _MainShellState extends State<MainShell> {
   }
 
   Future<void> _syncOfflineData() async {
-    SupabaseService.syncOfflineWorkouts();
+    try {
+      await workoutRepository.syncOfflineQueue();
+    } catch (_) {}
   }
 
   Future<void> _loadProfile() async {
     try {
-      final profile = await SupabaseService.getProfile(SupabaseService.currentUser!.id);
+      final profile = await profileRepository.getCurrentProfile();
       if (mounted) setState(() => _profile = profile);
     } catch (_) {}
   }
@@ -83,7 +85,7 @@ class _MainShellState extends State<MainShell> {
       _runDistanceKm = 0;
       _runElapsedSeconds = 0;
       _runPaceMinPerKm = 0;
-      _tab = 4;
+      _tab = 0;
     });
   }
 
@@ -108,30 +110,39 @@ class _MainShellState extends State<MainShell> {
   void _showProfile() {
     Haptics.vibrate(HapticsType.light);
     Navigator.of(context)
-        .push<void>(PageRouteBuilder<void>(
-          transitionDuration: const Duration(milliseconds: 280),
-          reverseTransitionDuration: const Duration(milliseconds: 220),
-          pageBuilder: (context, animation, secondaryAnimation) => ProfileScreen(
-            profile: _profile,
-            onSignOut: widget.onSignOut,
-            onSaved: _loadProfile,
+        .push<void>(
+          PageRouteBuilder<void>(
+            transitionDuration: const Duration(milliseconds: 280),
+            reverseTransitionDuration: const Duration(milliseconds: 220),
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                ProfileScreen(
+                  profile: _profile,
+                  onSignOut: widget.onSignOut,
+                  onSaved: _loadProfile,
+                ),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  final curved = CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                    reverseCurve: Curves.easeInCubic,
+                  );
+                  return FadeTransition(
+                    opacity: curved,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, 0.06),
+                        end: Offset.zero,
+                      ).animate(curved),
+                      child: child,
+                    ),
+                  );
+                },
           ),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            final curved = CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutCubic,
-              reverseCurve: Curves.easeInCubic,
-            );
-            return FadeTransition(
-              opacity: curved,
-              child: SlideTransition(
-                position: Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero).animate(curved),
-                child: child,
-              ),
-            );
-          },
-        ))
-        .then((_) { if (mounted) _loadProfile(); });
+        )
+        .then((_) {
+          if (mounted) _loadProfile();
+        });
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
@@ -148,25 +159,28 @@ class _MainShellState extends State<MainShell> {
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
-  bool get _isCardioWorkout {
-    final t = _activeWorkout?['type']?.toString().toLowerCase() ?? '';
-    return t == 'cardio' || t == 'run';
-  }
-
   @override
   Widget build(BuildContext context) {
     // ── Active workout full-screen modes ────────────────────────────────────
     if (_activeWorkout != null) {
       final t = _activeWorkout!['type']?.toString().toLowerCase() ?? '';
       if (t == 'hiit' || t == 'circuit') {
-        return CircuitPlayerScreen(workout: _activeWorkout!, onFinish: _finishWorkout);
+        return CircuitPlayerScreen(
+          workout: _activeWorkout!,
+          onFinish: _finishWorkout,
+        );
       } else if (t == 'cardio' || t == 'run') {
         return _cardioWithLiveBar();
       }
-      return ActiveWorkoutScreen(workout: _activeWorkout!, onFinish: _finishWorkout);
+      return ActiveWorkoutScreen(
+        workout: _activeWorkout!,
+        onFinish: _finishWorkout,
+      );
     }
 
-    final profileLabel = (_profile?['name'] ?? SupabaseService.currentUser?.email ?? 'A').toString();
+    final profileLabel =
+        (_profile?['name'] ?? authRepository.currentUser?.email ?? 'A')
+            .toString();
 
     return Scaffold(
       backgroundColor: ApexColors.bg,
@@ -178,16 +192,19 @@ class _MainShellState extends State<MainShell> {
                 child: IndexedStack(
                   index: _tab,
                   children: [
-                    HomeScreen(profile: _profile, onStartWorkout: _startWorkout),
+                    HomeScreen(
+                      profile: _profile,
+                      onStartWorkout: _startWorkout,
+                    ),
                     WorkoutScreen(onStartWorkout: _startWorkout),
                     const SocialFeedScreen(),
-                    const NutritionScreen(),
                     const ReportsScreen(),
                   ],
                 ),
               ),
               Positioned(
-                top: 8, right: 16,
+                top: 8,
+                right: 16,
                 child: ApexOrbLogo(
                   size: 52,
                   label: profileLabel,
@@ -223,7 +240,9 @@ class _MainShellState extends State<MainShell> {
 
           // ── Live GPS banner at top (always visible) ──────────────────────
           Positioned(
-            top: 0, left: 0, right: 0,
+            top: 0,
+            left: 0,
+            right: 0,
             child: _RunLiveBanner(
               active: _runActive,
               paused: _runPaused,
@@ -263,6 +282,7 @@ class _MainShellState extends State<MainShell> {
 
           return Expanded(
             child: GestureDetector(
+              key: ValueKey('nav_${(item['label'] as String).toLowerCase()}'),
               onTap: () {
                 if (_tab != index) {
                   Haptics.vibrate(HapticsType.selection);
@@ -287,8 +307,11 @@ class _MainShellState extends State<MainShell> {
                     Text(
                       item['label'] as String,
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: color, letterSpacing: 0.7,
-                        fontWeight: active ? FontWeight.bold : FontWeight.normal,
+                        color: color,
+                        letterSpacing: 0.7,
+                        fontWeight: active
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                       ),
                     ),
                     const SizedBox(height: 5),
@@ -340,46 +363,116 @@ class _RunLiveBanner extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(16, topPad + 6, 16, 10),
       decoration: BoxDecoration(
         color: const Color(0xF2000000),
-        border: Border(bottom: BorderSide(color: ApexColors.accent.withAlpha(80), width: 1)),
+        border: Border(
+          bottom: BorderSide(color: ApexColors.accent.withAlpha(80), width: 1),
+        ),
       ),
       child: Row(
         children: [
           // Status indicator
           Container(
-            width: 8, height: 8,
+            width: 8,
+            height: 8,
             margin: const EdgeInsets.only(right: 10),
             decoration: BoxDecoration(
-              color: paused ? ApexColors.orange : (active ? ApexColors.accent : Colors.white38),
+              color: paused
+                  ? ApexColors.orange
+                  : (active ? ApexColors.accent : Colors.white38),
               shape: BoxShape.circle,
-              boxShadow: active && !paused ? [BoxShadow(color: ApexColors.accent.withAlpha(120), blurRadius: 6)] : null,
+              boxShadow: active && !paused
+                  ? [
+                      BoxShadow(
+                        color: ApexColors.accent.withAlpha(120),
+                        blurRadius: 6,
+                      ),
+                    ]
+                  : null,
             ),
           ),
 
-          // Time  
-          Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Text('TIME', style: TextStyle(color: ApexColors.t3, fontSize: 8, fontWeight: FontWeight.w800, letterSpacing: 1)),
-            Text(formattedTime, style: GoogleFonts.inter(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
-          ]),
+          // Time
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'TIME',
+                style: TextStyle(
+                  color: ApexColors.t3,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1,
+                ),
+              ),
+              Text(
+                formattedTime,
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
+          ),
 
           const SizedBox(width: 20),
           _vertDivider(),
           const SizedBox(width: 20),
 
           // Distance
-          Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Text('KM', style: TextStyle(color: ApexColors.t3, fontSize: 8, fontWeight: FontWeight.w800, letterSpacing: 1)),
-            Text(distanceKm.toStringAsFixed(2), style: GoogleFonts.inter(color: ApexColors.accent, fontSize: 16, fontWeight: FontWeight.w800)),
-          ]),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'KM',
+                style: TextStyle(
+                  color: ApexColors.t3,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1,
+                ),
+              ),
+              Text(
+                distanceKm.toStringAsFixed(2),
+                style: GoogleFonts.inter(
+                  color: ApexColors.accent,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
 
           const SizedBox(width: 20),
           _vertDivider(),
           const SizedBox(width: 20),
 
           // Pace
-          Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-            Text('PACE /KM', style: TextStyle(color: ApexColors.t3, fontSize: 8, fontWeight: FontWeight.w800, letterSpacing: 1)),
-            Text(formattedPace, style: GoogleFonts.inter(color: const Color(0xFF64B5F6), fontSize: 16, fontWeight: FontWeight.w800)),
-          ]),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'PACE /KM',
+                style: TextStyle(
+                  color: ApexColors.t3,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1,
+                ),
+              ),
+              Text(
+                formattedPace,
+                style: GoogleFonts.inter(
+                  color: const Color(0xFF64B5F6),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
 
           const Spacer(),
 
@@ -387,30 +480,52 @@ class _RunLiveBanner extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: paused ? ApexColors.orange.withAlpha(30) : (active ? ApexColors.accent.withAlpha(30) : Colors.white10),
+              color: paused
+                  ? ApexColors.orange.withAlpha(30)
+                  : (active ? ApexColors.accent.withAlpha(30) : Colors.white10),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: paused ? ApexColors.orange.withAlpha(80) : (active ? ApexColors.accent.withAlpha(80) : Colors.white24)),
+              border: Border.all(
+                color: paused
+                    ? ApexColors.orange.withAlpha(80)
+                    : (active
+                          ? ApexColors.accent.withAlpha(80)
+                          : Colors.white24),
+              ),
             ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(
-                paused ? Icons.pause_rounded : (active ? Icons.directions_run_rounded : Icons.play_arrow_rounded),
-                color: paused ? ApexColors.orange : (active ? ApexColors.accent : Colors.white38),
-                size: 14,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                paused ? 'PAUSED' : (active ? 'RUNNING' : 'READY'),
-                style: TextStyle(
-                  color: paused ? ApexColors.orange : (active ? ApexColors.accent : Colors.white38),
-                  fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 0.7,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  paused
+                      ? Icons.pause_rounded
+                      : (active
+                            ? Icons.directions_run_rounded
+                            : Icons.play_arrow_rounded),
+                  color: paused
+                      ? ApexColors.orange
+                      : (active ? ApexColors.accent : Colors.white38),
+                  size: 14,
                 ),
-              ),
-            ]),
+                const SizedBox(width: 5),
+                Text(
+                  paused ? 'PAUSED' : (active ? 'RUNNING' : 'READY'),
+                  style: TextStyle(
+                    color: paused
+                        ? ApexColors.orange
+                        : (active ? ApexColors.accent : Colors.white38),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.7,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _vertDivider() => Container(width: 1, height: 32, color: Colors.white12);
+  Widget _vertDivider() =>
+      Container(width: 1, height: 32, color: Colors.white12);
 }

@@ -90,43 +90,51 @@ class StreakCalendar extends StatelessWidget {
       return ApexColors.t3;
     }
 
+    final monthString = '${_monthName(today.month)} ${today.year}'.toUpperCase();
+    
     return ApexCard(
-      floating: false,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Training calendar',
+                      'TRAINING LOG',
                       style: GoogleFonts.inter(
                         fontWeight: FontWeight.w800,
-                        fontSize: 18,
-                        color: ApexColors.t1,
+                        fontSize: 10,
+                        color: ApexColors.t3,
+                        letterSpacing: 1,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Your last five weeks.',
+                      monthString,
                       style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: ApexColors.t2,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 20,
+                        color: ApexColors.t1,
                       ),
                     ),
                   ],
                 ),
               ),
-              _legend('Heavy', ApexColors.orange),
-              const SizedBox(width: 8),
-              _legend('Mod', ApexColors.blue),
-              const SizedBox(width: 8),
-              _legend('Light', ApexColors.accentSoft),
-              const SizedBox(width: 8),
-              _legend('Photo', ApexColors.purple),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                alignment: WrapAlignment.end,
+                children: [
+                  _legend('Heavy', ApexColors.orange),
+                  _legend('Mod', ApexColors.blue),
+                  _legend('Light', ApexColors.accentSoft),
+                  _legend('Photo', ApexColors.purple),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -234,5 +242,13 @@ class StreakCalendar extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  static String _monthName(int m) {
+    const names = [
+      '', 'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return names[m];
   }
 }

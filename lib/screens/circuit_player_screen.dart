@@ -10,7 +10,11 @@ class CircuitPlayerScreen extends StatefulWidget {
   final Map<String, dynamic> workout;
   final VoidCallback onFinish;
 
-  const CircuitPlayerScreen({super.key, required this.workout, required this.onFinish});
+  const CircuitPlayerScreen({
+    super.key,
+    required this.workout,
+    required this.onFinish,
+  });
 
   @override
   State<CircuitPlayerScreen> createState() => _CircuitPlayerScreenState();
@@ -19,18 +23,20 @@ class CircuitPlayerScreen extends StatefulWidget {
 class _CircuitPlayerScreenState extends State<CircuitPlayerScreen> {
   late List<Map<String, dynamic>> _exercises;
   int _curExIdx = 0;
-  
+
   // States: 'prepare', 'work', 'rest', 'done'
   String _phase = 'prepare';
   int _timeRemaining = 10;
   Timer? _timer;
-  
+
   VideoPlayerController? _videoController;
 
   @override
   void initState() {
     super.initState();
-    _exercises = List<Map<String, dynamic>>.from(widget.workout['exercises'] ?? []);
+    _exercises = List<Map<String, dynamic>>.from(
+      widget.workout['exercises'] ?? [],
+    );
     if (_exercises.isNotEmpty) {
       _initVideoForCurrentExercise();
       _startPhase('prepare', 5); // 5 seconds preparation
@@ -42,10 +48,10 @@ class _CircuitPlayerScreenState extends State<CircuitPlayerScreen> {
   void _initVideoForCurrentExercise() {
     _videoController?.dispose();
     _videoController = null;
-    
+
     final ex = _exercises[_curExIdx];
     final url = ex['video_url'] as String?;
-    
+
     if (url != null && url.isNotEmpty) {
       _videoController = VideoPlayerController.networkUrl(Uri.parse(url))
         ..initialize().then((_) {
@@ -85,13 +91,21 @@ class _CircuitPlayerScreenState extends State<CircuitPlayerScreen> {
   void _nextPhase() {
     if (_phase == 'prepare' || _phase == 'rest') {
       // Transition to work
-       int workDuration = int.tryParse(_exercises[_curExIdx]['duration_sec']?.toString() ?? '45') ?? 45;
+      int workDuration =
+          int.tryParse(
+            _exercises[_curExIdx]['duration_sec']?.toString() ?? '45',
+          ) ??
+          45;
       _startPhase('work', workDuration);
     } else if (_phase == 'work') {
       // Finished work, move to rest or next exercise or done
       // In a real circuit, we might loop sets, but let's assume flat list for now.
       if (_curExIdx < _exercises.length - 1) {
-        int restDuration = int.tryParse(_exercises[_curExIdx]['rest_sec']?.toString() ?? '15') ?? 15;
+        int restDuration =
+            int.tryParse(
+              _exercises[_curExIdx]['rest_sec']?.toString() ?? '15',
+            ) ??
+            15;
         _curExIdx++;
         _initVideoForCurrentExercise();
         _startPhase('rest', restDuration);
@@ -132,7 +146,9 @@ class _CircuitPlayerScreenState extends State<CircuitPlayerScreen> {
   Future<void> _finishWorkout() async {
     try {
       await SupabaseService.createWorkoutLog({
-        'user_id': SupabaseService.currentUser!.id,
+        'user_id': SupabaseService.requireUserId(
+          action: 'save your circuit workout',
+        ),
         'workout_name': widget.workout['name'] ?? 'Circuit Training',
         'duration_min': ((_exercises.length * 60) / 60).round(), // Mock
         'total_volume': 0,
@@ -143,7 +159,8 @@ class _CircuitPlayerScreenState extends State<CircuitPlayerScreen> {
     if (mounted) widget.onFinish();
   }
 
-  String _fmt(int s) => '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
+  String _fmt(int s) =>
+      '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
 
   @override
   void dispose() {
@@ -161,16 +178,40 @@ class _CircuitPlayerScreenState extends State<CircuitPlayerScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.check_circle, color: ApexColors.accent, size: 80),
+              const Icon(
+                Icons.check_circle,
+                color: ApexColors.accent,
+                size: 80,
+              ),
               const SizedBox(height: 24),
-              Text('Circuit Complete!', style: GoogleFonts.inter(fontSize: 28, fontWeight: FontWeight.w800, color: ApexColors.t1)),
+              Text(
+                'Circuit Complete!',
+                style: GoogleFonts.inter(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: ApexColors.t1,
+                ),
+              ),
               const SizedBox(height: 32),
               GestureDetector(
                 onTap: _finishWorkout,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                  decoration: BoxDecoration(color: ApexColors.accent, borderRadius: BorderRadius.circular(12)),
-                  child: Text('Save & Exit', style: TextStyle(color: ApexColors.bg, fontSize: 16, fontWeight: FontWeight.bold)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 40,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    color: ApexColors.accent,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'Save & Exit',
+                    style: TextStyle(
+                      color: ApexColors.bg,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -196,17 +237,32 @@ class _CircuitPlayerScreenState extends State<CircuitPlayerScreen> {
                 children: [
                   GestureDetector(
                     onTap: widget.onFinish,
-                    child: const Icon(Icons.close, color: ApexColors.t2, size: 28),
+                    child: const Icon(
+                      Icons.close,
+                      color: ApexColors.t2,
+                      size: 28,
+                    ),
                   ),
                   Text(
                     isRest ? 'UP NEXT' : 'WORK',
-                    style: TextStyle(color: isRest ? ApexColors.blue : ApexColors.accent, fontWeight: FontWeight.w800, letterSpacing: 2, fontSize: 14),
+                    style: TextStyle(
+                      color: isRest ? ApexColors.blue : ApexColors.accent,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 2,
+                      fontSize: 14,
+                    ),
                   ),
-                  Text('${_curExIdx + 1} / ${_exercises.length}', style: const TextStyle(color: ApexColors.t2, fontWeight: FontWeight.bold)),
+                  Text(
+                    '${_curExIdx + 1} / ${_exercises.length}',
+                    style: const TextStyle(
+                      color: ApexColors.t2,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ),
             ),
-            
+
             // Video or Image Area
             Expanded(
               child: Container(
@@ -217,16 +273,33 @@ class _CircuitPlayerScreenState extends State<CircuitPlayerScreen> {
                   borderRadius: BorderRadius.circular(24),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: _videoController != null && _videoController!.value.isInitialized
+                child:
+                    _videoController != null &&
+                        _videoController!.value.isInitialized
                     ? Stack(
                         alignment: Alignment.center,
                         children: [
                           VideoPlayer(_videoController!),
                           if (_timeRemaining <= 0 || _timer?.isActive == false)
-                            Container(color: Colors.black45, child: const Center(child: Icon(Icons.play_circle_fill, size: 60, color: Colors.white70))),
+                            Container(
+                              color: Colors.black45,
+                              child: const Center(
+                                child: Icon(
+                                  Icons.play_circle_fill,
+                                  size: 60,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ),
                         ],
                       )
-                    : const Center(child: Icon(Icons.fitness_center, size: 80, color: ApexColors.border)),
+                    : const Center(
+                        child: Icon(
+                          Icons.fitness_center,
+                          size: 80,
+                          color: ApexColors.border,
+                        ),
+                      ),
               ),
             ),
 
@@ -236,14 +309,21 @@ class _CircuitPlayerScreenState extends State<CircuitPlayerScreen> {
               child: Text(
                 ex['name']?.toUpperCase() ?? 'EXERCISE',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.inter(fontSize: 32, fontWeight: FontWeight.w900, color: ApexColors.t1),
+                style: GoogleFonts.inter(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                  color: ApexColors.t1,
+                ),
               ),
             ),
 
             // Massive Exertion Timer
             Text(
               _fmt(_timeRemaining),
-              style: ApexTheme.mono(size: 96, color: isRest ? ApexColors.blue : ApexColors.accent).copyWith(fontWeight: FontWeight.w300),
+              style: ApexTheme.mono(
+                size: 96,
+                color: isRest ? ApexColors.blue : ApexColors.accent,
+              ).copyWith(fontWeight: FontWeight.w300),
             ),
 
             // Media Controls
@@ -268,7 +348,13 @@ class _CircuitPlayerScreenState extends State<CircuitPlayerScreen> {
                         color: ApexColors.surface,
                         border: Border.all(color: ApexColors.border, width: 2),
                       ),
-                      child: Icon(_timer?.isActive == true ? Icons.pause : Icons.play_arrow, size: 40, color: ApexColors.t1),
+                      child: Icon(
+                        _timer?.isActive == true
+                            ? Icons.pause
+                            : Icons.play_arrow,
+                        size: 40,
+                        color: ApexColors.t1,
+                      ),
                     ),
                   ),
                   IconButton(

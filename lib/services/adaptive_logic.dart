@@ -1,10 +1,8 @@
-import 'dart:math';
-
 class AdaptiveLogic {
   static const double minIncrement = 2.5; // kg
-  
+
   /// Calculates the recommended weight and reps for the next session.
-  /// Uses a standard progressive overload algorithm: 
+  /// Uses a standard progressive overload algorithm:
   /// If all sets were completed easily, increase weight by 2.5-5.0%.
   static Map<String, dynamic> recommendNextSession({
     required List<Map<String, dynamic>> previousSets,
@@ -16,19 +14,16 @@ class AdaptiveLogic {
     final doneSets = previousSets.where((s) => s['reps_done'] > 0).toList();
     if (doneSets.isEmpty) return {};
 
-    double totalWeight = 0;
     int totalReps = 0;
     double maxWeight = 0;
 
     for (var s in doneSets) {
       final w = (s['weight_kg'] as num).toDouble();
       final r = (s['reps_done'] as num).toInt();
-      totalWeight += w;
       totalReps += r;
       if (w > maxWeight) maxWeight = w;
     }
 
-    final avgWeight = totalWeight / doneSets.length;
     final avgReps = totalReps / doneSets.length;
 
     double recommendedWeight = maxWeight;
@@ -47,15 +42,18 @@ class AdaptiveLogic {
     }
 
     // Round to nearest 2.5kg (standard gym increment)
-    recommendedWeight = (recommendedWeight / minIncrement).round() * minIncrement;
-    
+    recommendedWeight =
+        (recommendedWeight / minIncrement).round() * minIncrement;
+
     // Ensure we don't recommend less than max weight if we succeeded
     if (recommendedWeight < maxWeight) recommendedWeight = maxWeight;
 
     return {
       'weight': recommendedWeight,
       'reps': recommendedReps,
-      'reason': intensity == 'light' ? 'Increasing for progressive overload' : 'Maintaining and refining current intensity',
+      'reason': intensity == 'light'
+          ? 'Increasing for progressive overload'
+          : 'Maintaining and refining current intensity',
     };
   }
 

@@ -25,6 +25,74 @@ class ExerciseAnimationService {
 
   static bool get hasApiKey => _apiKey.isNotEmpty;
 
+  static String? getBuiltInMotionKey(String exerciseName) {
+    final normalized = exerciseName.toLowerCase().trim();
+    if (_motionMap.containsKey(normalized)) {
+      return _motionMap[normalized];
+    }
+
+    final keywordMatches = <String, String>{
+      'push-up': 'push',
+      'bench press': 'push',
+      'chest press': 'push',
+      'dip': 'push',
+      'press': 'press',
+      'fly': 'press',
+      'row': 'row',
+      'pullover': 'row',
+      'pulldown': 'pull',
+      'pull-up': 'pull',
+      'chin-up': 'pull',
+      'raise': 'raise',
+      'shrug': 'raise',
+      'upright row': 'raise',
+      'curl': 'curl',
+      'pushdown': 'pushdown',
+      'extension': 'pushdown',
+      'kickback': 'pushdown',
+      'squat': 'squat',
+      'leg press': 'squat',
+      'leg extension': 'squat',
+      'hack squat': 'squat',
+      'lunge': 'lunge',
+      'split squat': 'lunge',
+      'step-up': 'lunge',
+      'deadlift': 'bridge',
+      'romanian': 'bridge',
+      'rdl': 'bridge',
+      'good morning': 'bridge',
+      'hip thrust': 'bridge',
+      'bridge': 'bridge',
+      'dead bug': 'core',
+      'bird dog': 'core',
+      'plank': 'core',
+      'crunch': 'core',
+      'sit-up': 'core',
+      'twist': 'core',
+      'woodchop': 'core',
+      'wood chop': 'core',
+      'leg raise': 'core',
+      'mountain climber': 'core',
+      'balance board': 'core',
+      'jumping jack': 'cardio',
+      'high knees': 'cardio',
+      'run': 'cardio',
+      'burpee': 'cardio',
+      'jump': 'cardio',
+      'battle rope': 'cardio',
+      'sled': 'cardio',
+      'march': 'cardio',
+    };
+
+    for (final entry in keywordMatches.entries) {
+      if (normalized.contains(entry.key)) {
+        return entry.value;
+      }
+    }
+
+    return null;
+  }
+
   /// Fetches the animated GIF URL for a specific exercise by name.
   /// Guaranteed to return the matching exercise (not a random one).
   static Future<String?> getGifUrl(String exerciseName) async {
@@ -184,5 +252,58 @@ class ExerciseAnimationService {
     'jumping jacks':
         'https://wger.de/media/exercise-images/165/Jumping-jack-1.png',
     'high knees': 'https://wger.de/media/exercise-images/222/High-knee-1.png',
+  };
+
+  static const Map<String, String> _motionMap = {
+    'incline push-ups': 'push',
+    'knee push-ups': 'push',
+    'push-ups': 'push',
+    'wide push-ups': 'push',
+    'wall push-ups': 'push',
+    'barbell bench press': 'press',
+    'incline dumbbell press': 'press',
+    'cable chest fly': 'press',
+    'bench press': 'push',
+    'seated dumbbell press': 'press',
+    'overhead press': 'press',
+    'pike push-ups': 'press',
+    'lat pulldown': 'pull',
+    'pull-ups': 'pull',
+    'chin-ups': 'pull',
+    'resistance band row': 'row',
+    'barbell row': 'row',
+    'seated cable row': 'row',
+    'chest-supported row': 'row',
+    'single-arm dumbbell row': 'row',
+    'lateral raises': 'raise',
+    'face pulls': 'raise',
+    'wall slides': 'raise',
+    'barbell curl': 'curl',
+    'hammer curls': 'curl',
+    'dumbbell bicep curls': 'curl',
+    'tricep pushdown': 'pushdown',
+    'barbell squat': 'squat',
+    'bodyweight squat': 'squat',
+    'box squat': 'squat',
+    'goblet squat': 'squat',
+    'leg press': 'squat',
+    'step-ups': 'lunge',
+    'lunges': 'lunge',
+    'bulgarian split squat': 'lunge',
+    'romanian deadlift': 'bridge',
+    'dumbbell romanian deadlift': 'bridge',
+    'glute bridge': 'bridge',
+    'hip thrust': 'bridge',
+    'dead bug': 'core',
+    'bird dog': 'core',
+    'plank': 'core',
+    'crunches': 'core',
+    'bicycle crunches': 'core',
+    'mountain climbers': 'core',
+    'jumping jacks': 'cardio',
+    'high knees': 'cardio',
+    'march in place': 'cardio',
+    'treadmill run': 'cardio',
+    'burpees': 'cardio',
   };
 }

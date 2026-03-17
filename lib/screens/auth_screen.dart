@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../constants/colors.dart';
+import '../repositories/auth_repository.dart';
 import '../services/supabase_service.dart';
 import '../widgets/apex_backdrop.dart';
 import '../widgets/apex_button.dart';
@@ -59,10 +60,10 @@ class _AuthScreenState extends State<AuthScreen> {
 
     try {
       if (_isLogin) {
-        await SupabaseService.signIn(_emailC.text.trim(), _pwC.text);
+        await authRepository.signIn(_emailC.text.trim(), _pwC.text);
         widget.onAuth();
       } else {
-        final res = await SupabaseService.signUp(
+        final res = await authRepository.signUp(
           _emailC.text.trim(),
           _pwC.text,
           _nameC.text.trim(),
@@ -80,13 +81,15 @@ class _AuthScreenState extends State<AuthScreen> {
             widget.onAuth();
           } else {
             setState(() {
-              _info = 'Check your inbox for the confirmation email, then sign in.';
+              _info =
+                  'Check your inbox for the confirmation email, then sign in.';
               _isLogin = true;
             });
           }
         } else {
           setState(() {
-            _info = 'Check your inbox for the confirmation email, then sign in.';
+            _info =
+                'Check your inbox for the confirmation email, then sign in.';
             _isLogin = true;
           });
         }
@@ -182,7 +185,8 @@ class _AuthScreenState extends State<AuthScreen> {
                       if (_info.isNotEmpty) const SizedBox(height: 12),
                       _messageCard(_err, ApexColors.red),
                     ],
-                    if (_info.isNotEmpty || _err.isNotEmpty) const SizedBox(height: 12),
+                    if (_info.isNotEmpty || _err.isNotEmpty)
+                      const SizedBox(height: 12),
                     ApexCard(
                       glow: true,
                       glowColor: ApexColors.accentSoft,
@@ -206,28 +210,46 @@ class _AuthScreenState extends State<AuthScreen> {
                             _fieldLabel('Full name'),
                             const SizedBox(height: 6),
                             TextField(
+                              key: const ValueKey('auth_name_field'),
                               controller: _nameC,
-                              style: GoogleFonts.inter(fontSize: 14, color: ApexColors.t1),
-                              decoration: const InputDecoration(hintText: 'Nilay Chavhan'),
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                color: ApexColors.t1,
+                              ),
+                              decoration: const InputDecoration(
+                                hintText: 'Nilay Chavhan',
+                              ),
                             ),
                             const SizedBox(height: 14),
                           ],
                           _fieldLabel('Email'),
                           const SizedBox(height: 6),
                           TextField(
+                            key: const ValueKey('auth_email_field'),
                             controller: _emailC,
                             keyboardType: TextInputType.emailAddress,
-                            style: GoogleFonts.inter(fontSize: 14, color: ApexColors.t1),
-                            decoration: const InputDecoration(hintText: 'you@example.com'),
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: ApexColors.t1,
+                            ),
+                            decoration: const InputDecoration(
+                              hintText: 'you@example.com',
+                            ),
                           ),
                           const SizedBox(height: 14),
                           _fieldLabel('Password'),
                           const SizedBox(height: 6),
                           TextField(
+                            key: const ValueKey('auth_password_field'),
                             controller: _pwC,
                             obscureText: true,
-                            style: GoogleFonts.inter(fontSize: 14, color: ApexColors.t1),
-                            decoration: const InputDecoration(hintText: 'Minimum 6 characters'),
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: ApexColors.t1,
+                            ),
+                            decoration: const InputDecoration(
+                              hintText: 'Minimum 6 characters',
+                            ),
                           ),
                           if (!_isLogin) ...[
                             const SizedBox(height: 16),
@@ -242,28 +264,43 @@ class _AuthScreenState extends State<AuthScreen> {
                                   return GestureDetector(
                                     onTap: () => setState(() => _goal = goal),
                                     child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 180),
+                                      duration: const Duration(
+                                        milliseconds: 180,
+                                      ),
                                       margin: const EdgeInsets.only(right: 12),
                                       padding: const EdgeInsets.all(16),
                                       width: 110,
                                       decoration: BoxDecoration(
-                                        color: selected ? ApexColors.accentDim : ApexColors.surface,
+                                        color: selected
+                                            ? ApexColors.accentDim
+                                            : ApexColors.surface,
                                         borderRadius: BorderRadius.circular(16),
                                         border: Border.all(
-                                          color: selected ? ApexColors.accent : ApexColors.border,
+                                          color: selected
+                                              ? ApexColors.accent
+                                              : ApexColors.border,
                                           width: selected ? 2 : 1,
                                         ),
                                       ),
                                       child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
-                                          Icon(Icons.flag_circle, size: 28, color: selected ? ApexColors.accent : ApexColors.t3),
+                                          Icon(
+                                            Icons.flag_circle,
+                                            size: 28,
+                                            color: selected
+                                                ? ApexColors.accent
+                                                : ApexColors.t3,
+                                          ),
                                           const SizedBox(height: 8),
                                           Text(
                                             goal,
                                             textAlign: TextAlign.center,
                                             style: GoogleFonts.inter(
-                                              color: selected ? ApexColors.t1 : ApexColors.t2,
+                                              color: selected
+                                                  ? ApexColors.t1
+                                                  : ApexColors.t2,
                                               fontSize: 11,
                                               fontWeight: FontWeight.w700,
                                             ),
@@ -284,7 +321,8 @@ class _AuthScreenState extends State<AuthScreen> {
                               divisions: 64,
                               activeColor: ApexColors.accent,
                               inactiveColor: ApexColors.borderStrong,
-                              onChanged: (v) => setState(() => _age = v.toInt()),
+                              onChanged: (v) =>
+                                  setState(() => _age = v.toInt()),
                             ),
                             const SizedBox(height: 16),
                             _fieldLabel('Fitness Level ($_level/10)'),
@@ -295,12 +333,16 @@ class _AuthScreenState extends State<AuthScreen> {
                               divisions: 9,
                               activeColor: ApexColors.accent,
                               inactiveColor: ApexColors.borderStrong,
-                              onChanged: (v) => setState(() => _level = v.toInt()),
+                              onChanged: (v) =>
+                                  setState(() => _level = v.toInt()),
                             ),
                           ],
                           const SizedBox(height: 18),
                           ApexButton(
-                            text: _isLogin ? 'Sign in with Email' : 'Create account',
+                            key: const ValueKey('auth_submit_button'),
+                            text: _isLogin
+                                ? 'Sign in with Email'
+                                : 'Create account',
                             onPressed: _submit,
                             full: true,
                             loading: _loading,
@@ -309,12 +351,31 @@ class _AuthScreenState extends State<AuthScreen> {
                             const SizedBox(height: 24),
                             Row(
                               children: [
-                                Expanded(child: Container(height: 1, color: ApexColors.border)),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                                  child: Text('OR', style: GoogleFonts.inter(fontSize: 11, color: ApexColors.t3, fontWeight: FontWeight.w700)),
+                                Expanded(
+                                  child: Container(
+                                    height: 1,
+                                    color: ApexColors.border,
+                                  ),
                                 ),
-                                Expanded(child: Container(height: 1, color: ApexColors.border)),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                  ),
+                                  child: Text(
+                                    'OR',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      color: ApexColors.t3,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Container(
+                                    height: 1,
+                                    color: ApexColors.border,
+                                  ),
+                                ),
                               ],
                             ),
                             const SizedBox(height: 24),
@@ -324,7 +385,9 @@ class _AuthScreenState extends State<AuthScreen> {
                               tone: ApexButtonTone.outline,
                               color: ApexColors.t1,
                               full: true,
-                              onPressed: () => SupabaseService.signInWithOAuth(OAuthProvider.google),
+                              onPressed: () => SupabaseService.signInWithOAuth(
+                                OAuthProvider.google,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             ApexButton(
@@ -333,7 +396,9 @@ class _AuthScreenState extends State<AuthScreen> {
                               tone: ApexButtonTone.outline,
                               color: ApexColors.t1,
                               full: true,
-                              onPressed: () => SupabaseService.signInWithOAuth(OAuthProvider.apple),
+                              onPressed: () => SupabaseService.signInWithOAuth(
+                                OAuthProvider.apple,
+                              ),
                             ),
                           ],
                         ],

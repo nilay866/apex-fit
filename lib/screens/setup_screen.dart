@@ -12,7 +12,8 @@ class SetupScreen extends StatefulWidget {
     required String key,
     required String aiKey,
     String? rapidApiKey,
-  }) onConnect;
+  })
+  onConnect;
   const SetupScreen({super.key, required this.onConnect});
 
   @override
@@ -85,13 +86,24 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
       setState(() => _err = 'Enter URL and key first.');
       return;
     }
-    setState(() { _testingDb = true; _dbResult = null; _err = ''; });
+    setState(() {
+      _testingDb = true;
+      _dbResult = null;
+      _err = '';
+    });
     try {
       final url = _urlC.text.trim().replaceAll(RegExp(r'/$'), '');
       Uri.parse('$url/rest/v1/');
-      setState(() => _dbResult = {'ok': true, 'msg': '✅ Supabase URL looks valid!'});
+      setState(
+        () => _dbResult = {'ok': true, 'msg': '✅ Supabase URL looks valid!'},
+      );
     } catch (e) {
-      setState(() => _dbResult = {'ok': false, 'msg': '❌ Cannot reach Supabase. Check URL.'});
+      setState(
+        () => _dbResult = {
+          'ok': false,
+          'msg': '❌ Cannot reach Supabase. Check URL.',
+        },
+      );
     } finally {
       setState(() => _testingDb = false);
     }
@@ -99,15 +111,27 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
 
   Future<void> _testAi() async {
     if (_aiKeyC.text.trim().isEmpty) {
-      setState(() => _aiResult = {'ok': false, 'msg': 'Enter your Gemini API key first.'});
+      setState(
+        () => _aiResult = {
+          'ok': false,
+          'msg': 'Enter your Gemini API key first.',
+        },
+      );
       return;
     }
-    setState(() { _testingAi = true; _aiResult = null; });
+    setState(() {
+      _testingAi = true;
+      _aiResult = null;
+    });
     try {
-      final ok = await AIService.testConnection();
-      setState(() => _aiResult = ok
-          ? {'ok': true, 'msg': '✅ Gemini AI working!'}
-          : {'ok': false, 'msg': '❌ Invalid API key'});
+      final ok = await AIService.testConnection(
+        geminiApiKey: _aiKeyC.text.trim(),
+      );
+      setState(
+        () => _aiResult = ok
+            ? {'ok': true, 'msg': '✅ Gemini AI working!'}
+            : {'ok': false, 'msg': '❌ Invalid API key'},
+      );
     } catch (e) {
       setState(() => _aiResult = {'ok': false, 'msg': '❌ $e'});
     } finally {
@@ -115,10 +139,33 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
     }
   }
 
+  void _launch() {
+    final url = _urlC.text.trim().replaceAll(RegExp(r'/$'), '');
+    final key = _keyC.text.trim();
+    final aiKey = _aiKeyC.text.trim();
+
+    if (url.isEmpty || key.isEmpty || aiKey.isEmpty) {
+      setState(
+        () => _err = 'Enter your Supabase URL, anon key, and Gemini API key.',
+      );
+      return;
+    }
+
+    try {
+      final parsedUrl = Uri.parse(url);
+      if (!parsedUrl.hasScheme || parsedUrl.host.isEmpty) {
+        throw const FormatException('Invalid Supabase URL');
+      }
+    } catch (_) {
+      setState(() => _err = 'Enter a valid Supabase project URL.');
+      return;
+    }
+
+    setState(() => _err = '');
     widget.onConnect(
-      url: _urlC.text.trim().replaceAll(RegExp(r'/$'), ''),
-      key: _keyC.text.trim(),
-      aiKey: _aiKeyC.text.trim(),
+      url: url,
+      key: key,
+      aiKey: aiKey,
       rapidApiKey: _rapidC.text.trim().isNotEmpty ? _rapidC.text.trim() : null,
     );
   }
@@ -146,16 +193,33 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      width: 46, height: 46,
-                      decoration: BoxDecoration(color: ApexColors.accent, borderRadius: BorderRadius.circular(13)),
-                      child: const Center(child: Text('⚡', style: TextStyle(fontSize: 23))),
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: ApexColors.accent,
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      child: const Center(
+                        child: Text('⚡', style: TextStyle(fontSize: 23)),
+                      ),
                     ),
                     const SizedBox(width: 10),
-                    Text('APEX AI', style: GoogleFonts.inter(fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: 2, color: ApexColors.t1)),
+                    Text(
+                      'APEX AI',
+                      style: GoogleFonts.inter(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 2,
+                        color: ApexColors.t1,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text('AI-Powered Fitness Coach', style: GoogleFonts.inter(fontSize: 12, color: ApexColors.t2)),
+                Text(
+                  'AI-Powered Fitness Coach',
+                  style: GoogleFonts.inter(fontSize: 12, color: ApexColors.t2),
+                ),
                 const SizedBox(height: 24),
                 ApexCard(
                   child: Column(
@@ -168,27 +232,64 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: ApexColors.surface,
-                              border: Border.all(color: ApexColors.border, style: BorderStyle.solid),
+                              border: Border.all(
+                                color: ApexColors.border,
+                                style: BorderStyle.solid,
+                              ),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Center(child: Text('→ supabase.com (free)', style: TextStyle(color: ApexColors.blue, fontSize: 12))),
+                            child: Center(
+                              child: Text(
+                                '→ supabase.com (free)',
+                                style: TextStyle(
+                                  color: ApexColors.blue,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 6),
-                        Text('⚠️ Free projects pause after 1 week — Resume at supabase.com if needed',
-                            style: GoogleFonts.inter(fontSize: 10, color: ApexColors.yellow, height: 1.5)),
+                        Text(
+                          '⚠️ Free projects pause after 1 week — Resume at supabase.com if needed',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            color: ApexColors.yellow,
+                            height: 1.5,
+                          ),
+                        ),
                       ]),
                       _step(2, 'Run SQL schema', [
                         GestureDetector(
                           onTap: () => setState(() => _showSql = !_showSql),
                           child: Container(
                             padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(color: ApexColors.surface, border: Border.all(color: ApexColors.border), borderRadius: BorderRadius.circular(8)),
-                            child: Row(children: [
-                              Text(_showSql ? '▾' : '▸', style: TextStyle(color: ApexColors.t2, fontSize: 11)),
-                              const SizedBox(width: 6),
-                              Expanded(child: Text('Show SQL → paste into Supabase SQL Editor → Run', style: TextStyle(color: ApexColors.t2, fontSize: 11))),
-                            ]),
+                            decoration: BoxDecoration(
+                              color: ApexColors.surface,
+                              border: Border.all(color: ApexColors.border),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Text(
+                                  _showSql ? '▾' : '▸',
+                                  style: TextStyle(
+                                    color: ApexColors.t2,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Show SQL → paste into Supabase SQL Editor → Run',
+                                    style: TextStyle(
+                                      color: ApexColors.t2,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                         if (_showSql) ...[
@@ -196,27 +297,68 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
                           Stack(
                             children: [
                               Container(
-                                constraints: const BoxConstraints(maxHeight: 140),
+                                constraints: const BoxConstraints(
+                                  maxHeight: 140,
+                                ),
                                 padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(color: ApexColors.surface, border: Border.all(color: ApexColors.border), borderRadius: BorderRadius.circular(8)),
+                                decoration: BoxDecoration(
+                                  color: ApexColors.surface,
+                                  border: Border.all(color: ApexColors.border),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                                 child: SingleChildScrollView(
-                                  child: Text(_sql, style: GoogleFonts.dmMono(fontSize: 9.5, color: ApexColors.t2, height: 1.5)),
+                                  child: Text(
+                                    _sql,
+                                    style: GoogleFonts.dmMono(
+                                      fontSize: 9.5,
+                                      color: ApexColors.t2,
+                                      height: 1.5,
+                                    ),
+                                  ),
                                 ),
                               ),
                               Positioned(
-                                top: 7, right: 7,
+                                top: 7,
+                                right: 7,
                                 child: GestureDetector(
                                   onTap: () {
-                                    Clipboard.setData(ClipboardData(text: _sql));
+                                    Clipboard.setData(
+                                      ClipboardData(text: _sql),
+                                    );
                                     setState(() => _copied = true);
-                                    Future.delayed(const Duration(seconds: 2), () {
-                                      if (mounted) setState(() => _copied = false);
-                                    });
+                                    Future.delayed(
+                                      const Duration(seconds: 2),
+                                      () {
+                                        if (mounted) {
+                                          setState(() => _copied = false);
+                                        }
+                                      },
+                                    );
                                   },
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 2),
-                                    decoration: BoxDecoration(color: _copied ? ApexColors.accent : ApexColors.card, border: Border.all(color: ApexColors.border), borderRadius: BorderRadius.circular(6)),
-                                    child: Text(_copied ? '✓' : 'Copy', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _copied ? ApexColors.bg : ApexColors.t2)),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 9,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _copied
+                                          ? ApexColors.accent
+                                          : ApexColors.card,
+                                      border: Border.all(
+                                        color: ApexColors.border,
+                                      ),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      _copied ? '✓' : 'Copy',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: _copied
+                                            ? ApexColors.bg
+                                            : ApexColors.t2,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -225,11 +367,25 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
                         ],
                       ]),
                       _step(3, 'Supabase credentials (Settings → API)', [
-                        _buildField('Project URL', _urlC, 'https://xxxxxxxx.supabase.co'),
+                        _buildField(
+                          'Project URL',
+                          _urlC,
+                          'https://xxxxxxxx.supabase.co',
+                        ),
                         const SizedBox(height: 9),
-                        _buildField('Anon/Public Key', _keyC, 'eyJhbGci...', mono: true),
+                        _buildField(
+                          'Anon/Public Key',
+                          _keyC,
+                          'eyJhbGci...',
+                          mono: true,
+                        ),
                         const SizedBox(height: 9),
-                        _buildTestButton('🔍 Test Supabase Connection', _testingDb, _testDb, ApexColors.blue),
+                        _buildTestButton(
+                          '🔍 Test Supabase Connection',
+                          _testingDb,
+                          _testDb,
+                          ApexColors.blue,
+                        ),
                         if (_dbResult != null) _resultBox(_dbResult!),
                       ]),
                       _step(4, 'Gemini API key (Free — google aistudio)', [
@@ -237,24 +393,62 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
                           onTap: () {},
                           child: Container(
                             padding: const EdgeInsets.all(7),
-                            decoration: BoxDecoration(color: ApexColors.surface, border: Border.all(color: ApexColors.border), borderRadius: BorderRadius.circular(8)),
-                            child: Center(child: Text('→ aistudio.google.com — 100% free', style: TextStyle(color: ApexColors.accent, fontSize: 11))),
+                            decoration: BoxDecoration(
+                              color: ApexColors.surface,
+                              border: Border.all(color: ApexColors.border),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '→ aistudio.google.com — 100% free',
+                                style: TextStyle(
+                                  color: ApexColors.accent,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 7),
-                        _buildField('Gemini Key', _aiKeyC, 'AIzaSy...', mono: true),
+                        _buildField(
+                          'Gemini Key',
+                          _aiKeyC,
+                          'AIzaSy...',
+                          mono: true,
+                        ),
                         const SizedBox(height: 9),
-                        _buildTestButton('🤖 Test Gemini AI', _testingAi, _testAi, ApexColors.purple),
+                        _buildTestButton(
+                          '🤖 Test Gemini AI',
+                          _testingAi,
+                          _testAi,
+                          ApexColors.purple,
+                        ),
                         if (_aiResult != null) _resultBox(_aiResult!),
                       ]),
                       if (_err.isNotEmpty)
                         Container(
                           margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                          decoration: BoxDecoration(color: ApexColors.red.withAlpha(20), borderRadius: BorderRadius.circular(7)),
-                          child: Text(_err, style: TextStyle(color: ApexColors.red, fontSize: 11)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: ApexColors.red.withAlpha(20),
+                            borderRadius: BorderRadius.circular(7),
+                          ),
+                          child: Text(
+                            _err,
+                            style: TextStyle(
+                              color: ApexColors.red,
+                              fontSize: 11,
+                            ),
+                          ),
                         ),
-                      ApexButton(text: 'Launch App ⚡', onPressed: _launch, full: true),
+                      ApexButton(
+                        text: 'Launch App ⚡',
+                        onPressed: _launch,
+                        full: true,
+                      ),
                     ],
                   ),
                 ),
@@ -275,12 +469,32 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
           Row(
             children: [
               Container(
-                width: 24, height: 24,
-                decoration: const BoxDecoration(color: ApexColors.accent, shape: BoxShape.circle),
-                child: Center(child: Text('$n', style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w800, color: ApexColors.bg))),
+                width: 24,
+                height: 24,
+                decoration: const BoxDecoration(
+                  color: ApexColors.accent,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    '$n',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: ApexColors.bg,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(width: 9),
-              Text(title, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 13, color: ApexColors.t1)),
+              Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: ApexColors.t1,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 11),
@@ -290,37 +504,79 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
     );
   }
 
-  Widget _buildField(String label, TextEditingController controller, String hint, {bool mono = false}) {
+  Widget _buildField(
+    String label,
+    TextEditingController controller,
+    String hint, {
+    bool mono = false,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label.toUpperCase(), style: GoogleFonts.inter(fontSize: 11, color: ApexColors.t2, fontWeight: FontWeight.w700, letterSpacing: 0.7)),
+        Text(
+          label.toUpperCase(),
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            color: ApexColors.t2,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.7,
+          ),
+        ),
         const SizedBox(height: 4),
         TextField(
           controller: controller,
-          style: (mono ? GoogleFonts.dmMono : GoogleFonts.inter)(fontSize: 13, color: ApexColors.t1),
+          style: (mono ? GoogleFonts.dmMono : GoogleFonts.inter)(
+            fontSize: 13,
+            color: ApexColors.t1,
+          ),
           decoration: InputDecoration(hintText: hint),
         ),
       ],
     );
   }
 
-  Widget _buildTestButton(String text, bool loading, VoidCallback onTap, Color color) {
+  Widget _buildTestButton(
+    String text,
+    bool loading,
+    VoidCallback onTap,
+    Color color,
+  ) {
     return GestureDetector(
       onTap: loading ? null : onTap,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(9),
-        decoration: BoxDecoration(border: Border.all(color: color, width: 1.5), borderRadius: BorderRadius.circular(8)),
+        decoration: BoxDecoration(
+          border: Border.all(color: color, width: 1.5),
+          borderRadius: BorderRadius.circular(8),
+        ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (loading) ...[
-              SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: color)),
+              SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(strokeWidth: 2, color: color),
+              ),
               const SizedBox(width: 7),
-              Text('Testing...', style: GoogleFonts.inter(color: color, fontWeight: FontWeight.w700, fontSize: 11)),
+              Text(
+                'Testing...',
+                style: GoogleFonts.inter(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
             ] else
-              Text(text, style: GoogleFonts.inter(color: color, fontWeight: FontWeight.w700, fontSize: 11)),
+              Text(
+                text,
+                style: GoogleFonts.inter(
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
           ],
         ),
       ),
@@ -338,7 +594,10 @@ create trigger on_auth_user_created after insert on auth.users for each row exec
         border: Border.all(color: color.withAlpha(64)),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(result['msg'] as String, style: TextStyle(color: color, fontSize: 11, height: 1.5)),
+      child: Text(
+        result['msg'] as String,
+        style: TextStyle(color: color, fontSize: 11, height: 1.5),
+      ),
     );
   }
 }

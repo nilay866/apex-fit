@@ -1,19 +1,28 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../constants/colors.dart';
-import '../constants/theme.dart';
+import '../repositories/auth_repository.dart';
 import '../widgets/apex_button.dart';
-import '../services/supabase_service.dart';
+import '../repositories/workout_repository.dart';
 import '../services/storage_service.dart';
 import '../services/adaptive_logic.dart';
 import '../workout_engine/plate_calculator.dart';
-import 'package:flutter/services.dart';
+import 'active_workout/widgets/rest_timer_banner.dart';
+import 'active_workout/widgets/session_footer.dart';
+import 'active_workout/widgets/smart_tip_banner.dart';
+import 'active_workout/widgets/workout_header.dart';
+import 'active_workout/widgets/workout_set_row.dart';
 
 class ActiveWorkoutScreen extends StatefulWidget {
   final Map<String, dynamic> workout;
   final VoidCallback onFinish;
-  const ActiveWorkoutScreen({super.key, required this.workout, required this.onFinish});
+  const ActiveWorkoutScreen({
+    super.key,
+    required this.workout,
+    required this.onFinish,
+  });
 
   @override
   State<ActiveWorkoutScreen> createState() => _ActiveWorkoutScreenState();
@@ -27,6 +36,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   List<Map<String, dynamic>> _previousSets = [];
   final Map<int, String> _exNotes = {};
   final _exNoteC = TextEditingController();
+  final _sessionNotesC = TextEditingController();
   int? _focusedEx;
   int? _focusedSet;
   int? _rest;
@@ -42,16 +52,25 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   void initState() {
     super.initState();
     _loadPrevious();
-    
-    final exList = (widget.workout['exercises'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    _sessionNotesC.addListener(() {
+      _notes = _sessionNotesC.text;
+      _saveState();
+    });
+
+    final exList =
+        (widget.workout['exercises'] as List?)?.cast<Map<String, dynamic>>() ??
+        [];
     _exercises = exList;
-    
+
     // Initialize default logs
     for (int i = 0; i < exList.length; i++) {
       final sets = (exList[i]['sets'] as int?) ?? 3;
       final repsStr = exList[i]['reps']?.toString().split('-')[0] ?? '8';
       final tw = exList[i]['target_weight']?.toString() ?? '';
-      _logs[i] = List.generate(sets, (_) => {'reps': repsStr, 'weight': tw, 'done': false, 'type': 'normal'});
+      _logs[i] = List.generate(
+        sets,
+        (_) => {'reps': repsStr, 'weight': tw, 'done': false, 'type': 'normal'},
+      );
     }
 
     _checkRecoveredState();
@@ -77,7 +96,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               _timer = state['timer'] as int? ?? 0;
               _cur = state['cur'] as int? ?? 0;
               state['logs']?.forEach((k, v) {
-                _logs[int.parse(k.toString())] = List<Map<String, dynamic>>.from(v as List);
+                _logs[int.parse(k.toString())] =
+                    List<Map<String, dynamic>>.from(v as List);
               });
               state['exNotes']?.forEach((k, v) {
                 _exNotes[int.parse(k.toString())] = v as String;
@@ -85,8 +105,13 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               _notes = state['notes'] as String? ?? '';
               _intensity = state['intensity'] as String? ?? 'moderate';
             });
+            _exNoteC.text = _exNotes[_cur] ?? '';
+            _sessionNotesC.text = _notes;
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Recovered previous session progress.'), backgroundColor: ApexColors.accent),
+              const SnackBar(
+                content: Text('Recovered previous session progress.'),
+                backgroundColor: ApexColors.accent,
+              ),
             );
           }
         }
@@ -113,8 +138,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
   Future<void> _loadPrevious() async {
     try {
-      final pSets = await SupabaseService.getPreviousWorkoutStats(
-        SupabaseService.currentUser!.id,
+      final pSets = await workoutRepository.getPreviousWorkoutStats(
         widget.workout['name'] ?? '',
       );
       if (mounted) {
@@ -123,7 +147,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           // After loading previous sets, apply AI recommendations to initial logs
           for (int i = 0; i < _exercises.length; i++) {
             final exName = _exercises[i]['name'];
-            final exPSets = pSets.where((ps) => ps['exercise_name'] == exName).toList();
+            final exPSets = pSets
+                .where((ps) => ps['exercise_name'] == exName)
+                .toList();
             if (exPSets.isNotEmpty) {
               final rec = AdaptiveLogic.recommendNextSession(
                 previousSets: exPSets,
@@ -133,7 +159,11 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 final recW = rec['weight'].toString();
                 // Update only sets that haven't been touched yet
                 for (var s in _logs[i]!) {
-                  if (s['done'] == false && (s['weight'] == null || s['weight'] == '' || s['weight'] == _exercises[i]['target_weight']?.toString())) {
+                  if (s['done'] == false &&
+                      (s['weight'] == null ||
+                          s['weight'] == '' ||
+                          s['weight'] ==
+                              _exercises[i]['target_weight']?.toString())) {
                     s['weight'] = recW;
                   }
                 }
@@ -150,10 +180,50 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     _tRef?.cancel();
     _rRef?.cancel();
     _exNoteC.dispose();
+    _sessionNotesC.dispose();
     super.dispose();
   }
 
-  String _fmt(int s) => '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
+  String _fmt(int s) =>
+      '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
+
+  void _selectExercise(int index) {
+    setState(() => _cur = index);
+    _exNoteC.text = _exNotes[index] ?? '';
+    _saveState();
+  }
+
+  Map<String, dynamic>? _previousSetFor(String exerciseName, int setNumber) {
+    for (final prevSet in _previousSets) {
+      if (prevSet['exercise_name'] == exerciseName &&
+          prevSet['set_number'] == setNumber) {
+        return prevSet;
+      }
+    }
+    return null;
+  }
+
+  int? _deltaPercentForSet(
+    String exerciseName,
+    int setNumber,
+    Map<String, dynamic> setLog,
+  ) {
+    final previous = _previousSetFor(exerciseName, setNumber);
+    if (previous == null || setLog['done'] != true) return null;
+
+    final previousVolume =
+        (num.tryParse(previous['reps_done']?.toString() ?? '') ?? 0) *
+        (num.tryParse(previous['weight_kg']?.toString() ?? '') ?? 0);
+    final currentVolume =
+        (num.tryParse(setLog['reps']?.toString() ?? '') ?? 0) *
+        (num.tryParse(setLog['weight']?.toString() ?? '') ?? 0);
+
+    if (previousVolume <= 0 || currentVolume <= 0) return null;
+
+    final percent = ((currentVolume - previousVolume) / previousVolume * 100)
+        .round();
+    return percent == 0 ? null : percent;
+  }
 
   void _startRest() {
     setState(() => _rest = 60);
@@ -185,6 +255,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       }
       s['type'] = n;
     });
+    _saveState();
   }
 
   void _toggle(int ei, int si) {
@@ -199,7 +270,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     });
     final s = _logs[_cur]![si];
     if (!(s['done'] as bool? ?? false)) return;
-    
+
     // Phase 15: AI Live Adjustment
     final targetReps = 8; // Default or from exercise meta
     final actualReps = int.tryParse(s['reps']?.toString() ?? '0') ?? 0;
@@ -216,6 +287,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       });
     }
 
+    _saveState();
     if (s['type'] != 'drop') _startRest();
   }
 
@@ -227,20 +299,34 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   void _addSet(int ei) {
     setState(() {
       final last = _logs[ei]!.last;
-      _logs[ei]!.add({'reps': '8', 'weight': last['weight'] ?? '', 'done': false, 'type': 'normal'});
+      _logs[ei]!.add({
+        'reps': '8',
+        'weight': last['weight'] ?? '',
+        'done': false,
+        'type': 'normal',
+      });
     });
     _saveState();
   }
 
-  int get _totalVol => _logs.values.expand((e) => e).where((s) => s['done'] == true)
-      .fold(0, (a, s) => a + ((int.tryParse(s['reps']?.toString() ?? '0') ?? 0) * (double.tryParse(s['weight']?.toString() ?? '0')?.round() ?? 0)));
+  double get _totalVol => _logs.values
+      .expand((e) => e)
+      .where((s) => s['done'] == true)
+      .fold(
+        0.0,
+        (a, s) =>
+            a +
+            ((double.tryParse(s['reps']?.toString() ?? '0') ?? 0) *
+                (double.tryParse(s['weight']?.toString() ?? '0') ?? 0)),
+      );
 
-  int get _doneCount => _logs.values.expand((e) => e).where((s) => s['done'] == true).length;
+  int get _doneCount =>
+      _logs.values.expand((e) => e).where((s) => s['done'] == true).length;
   int get _totalCount => _logs.values.expand((e) => e).length;
 
   Future<void> _finish() async {
     setState(() => _saving = true);
-    
+
     String aggNotes = _notes;
     _exercises.asMap().forEach((ei, ex) {
       if ((_exNotes[ei] ?? '').trim().isNotEmpty) {
@@ -250,7 +336,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     aggNotes = aggNotes.trim();
 
     final payload = {
-      'user_id': SupabaseService.currentUser!.id,
+      'user_id': authRepository.requireUserId(),
       'workout_name': widget.workout['name'],
       'duration_min': (_timer / 60).round(),
       'total_volume': _totalVol,
@@ -263,7 +349,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       (_logs[ei] ?? []).asMap().forEach((si, s) {
         if (s['done'] == true) {
           (payload['sets'] as List).add({
-             // log_id will be set during actual sync
+            // log_id will be set during actual sync
             'exercise_name': ex['name'],
             'set_number': si + 1,
             'set_type': s['type'] ?? 'normal',
@@ -275,41 +361,61 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       });
     });
 
+    final sets = (payload['sets'] as List).cast<Map<String, dynamic>>();
+    final logPayload = Map<String, dynamic>.from(payload)..remove('sets');
+
     try {
-      final logPayload = Map<String, dynamic>.from(payload)..remove('sets');
-      final log = await SupabaseService.createWorkoutLog(logPayload);
-      
-      final sets = (payload['sets'] as List).cast<Map<String, dynamic>>();
-      for (var s in sets) {
-        s['log_id'] = log['id'];
+      final result = await workoutRepository.completeWorkoutSession(
+        logPayload: logPayload,
+        sets: sets,
+      );
+      if (mounted && result.savedOffline) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Saved offline. Will sync when connected.'),
+            backgroundColor: ApexColors.blue,
+          ),
+        );
       }
-      await SupabaseService.createSetLogs(sets);
-      await StorageService.clearActiveWorkoutState();
-    } catch (e) {
-      try {
-        await StorageService.saveOfflineWorkout(payload);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved offline. Will sync when connected.'), backgroundColor: ApexColors.blue));
-      } catch (innerE) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to save workout. Please try again.'), backgroundColor: Colors.red));
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to save workout. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _saving = false);
       }
+      return;
     }
 
     String? prMessage;
     for (var ei = 0; ei < _exercises.length; ei++) {
       if (prMessage != null) break;
       final exName = _exercises[ei]['name'];
-      final prevSets = _previousSets[exName] as List<dynamic>? ?? [];
+      final prevSets = _previousSets
+          .where((set) => set['exercise_name'] == exName)
+          .toList();
       final currSets = _logs[ei] ?? [];
-      
-      int pVol = 0;
+
+      double pVol = 0;
       for (var s in prevSets) {
-        pVol += (int.tryParse(s['reps']?.toString() ?? '0') ?? 0) * (double.tryParse(s['weight']?.toString() ?? '0')?.round() ?? 0);
+        pVol +=
+            (double.tryParse(s['reps_done']?.toString() ?? '0') ?? 0) *
+            (double.tryParse(s['weight_kg']?.toString() ?? '0') ?? 0);
       }
-      
-      int cVol = 0;
+      pVol = (pVol * 10).roundToDouble() / 10; // Precision normalize
+
+      double cVol = 0;
       for (var s in currSets) {
-        if (s['done'] == true) cVol += (int.tryParse(s['reps']?.toString() ?? '0') ?? 0) * (double.tryParse(s['weight']?.toString() ?? '0')?.round() ?? 0);
+        if (s['done'] == true) {
+          cVol +=
+              (double.tryParse(s['reps']?.toString() ?? '0') ?? 0) *
+              (double.tryParse(s['weight']?.toString() ?? '0') ?? 0);
+        }
       }
+      cVol = (cVol * 10).roundToDouble() / 10; // Precision normalize
 
       if (cVol > 0 && pVol > 0 && cVol > pVol) {
         final pct = ((cVol - pVol) / pVol * 100).round();
@@ -328,11 +434,28 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.workspace_premium_rounded, size: 100, color: ApexColors.yellow),
+                const Icon(
+                  Icons.workspace_premium_rounded,
+                  size: 100,
+                  color: ApexColors.yellow,
+                ),
                 const SizedBox(height: 24),
-                Text(prMessage!, textAlign: TextAlign.center, style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 32, color: ApexColors.yellow, height: 1.2)),
+                Text(
+                  prMessage!,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 32,
+                    color: ApexColors.yellow,
+                    height: 1.2,
+                  ),
+                ),
                 const SizedBox(height: 48),
-                ApexButton(text: 'Let\'s Go', onPressed: () => Navigator.pop(ctx), color: ApexColors.yellow),
+                ApexButton(
+                  text: 'Let\'s Go',
+                  onPressed: () => Navigator.pop(ctx),
+                  color: ApexColors.yellow,
+                ),
               ],
             ),
           ),
@@ -340,6 +463,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       );
     }
 
+    if (mounted) {
+      setState(() => _saving = false);
+    }
     widget.onFinish();
   }
 
@@ -351,83 +477,24 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: ApexColors.surface, border: Border(bottom: BorderSide(color: ApexColors.border))),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(widget.workout['name'] ?? '', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16, color: ApexColors.t1)),
-                        Text('$_doneCount/$_totalCount sets · ${_totalVol}kg', style: TextStyle(color: ApexColors.t2, fontSize: 10)),
-                      ]),
-                      Text(_fmt(_timer), style: ApexTheme.mono(size: 24, color: ApexColors.accent)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(2),
-                    child: LinearProgressIndicator(
-                      value: _totalCount > 0 ? _doneCount / _totalCount : 0,
-                      minHeight: 3,
-                      backgroundColor: ApexColors.border,
-                      valueColor: const AlwaysStoppedAnimation(ApexColors.accent),
-                    ),
-                  ),
-                ],
-              ),
+            ActiveWorkoutHeader(
+              workoutName: widget.workout['name'] ?? '',
+              doneCount: _doneCount,
+              totalCount: _totalCount,
+              totalVolume: _totalVol,
+              elapsedLabel: _fmt(_timer),
             ),
 
-            // Rest timer
             if (_rest != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(color: ApexColors.blue.withAlpha(24), border: Border(bottom: BorderSide(color: ApexColors.blue, width: 2))),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Rest timer', style: TextStyle(color: ApexColors.blue, fontWeight: FontWeight.w700, fontSize: 11)),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            GestureDetector(
-                              onTap: () => setState(() => _rest = (_rest! - 5).clamp(1, 9999)),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(color: ApexColors.blue.withAlpha(40), borderRadius: BorderRadius.circular(4)),
-                                child: Text('-5s', style: TextStyle(color: ApexColors.blue, fontSize: 11, fontWeight: FontWeight.bold)),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: () => setState(() => _rest = _rest! + 15),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(color: ApexColors.blue.withAlpha(40), borderRadius: BorderRadius.circular(4)),
-                                child: Text('+15s', style: TextStyle(color: ApexColors.blue, fontSize: 11, fontWeight: FontWeight.bold)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    Text(_fmt(_rest!), style: ApexTheme.mono(size: 24, color: ApexColors.blue)),
-                    GestureDetector(
-                      onTap: () { _rRef?.cancel(); setState(() => _rest = null); },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                        decoration: BoxDecoration(color: ApexColors.blue.withAlpha(40), borderRadius: BorderRadius.circular(6)),
-                        child: Text('Skip', style: TextStyle(color: ApexColors.blue, fontWeight: FontWeight.w700, fontSize: 10)),
-                      ),
-                    ),
-                  ],
-                ),
+              RestTimerBanner(
+                formattedTime: _fmt(_rest!),
+                onDecrease: () =>
+                    setState(() => _rest = (_rest! - 5).clamp(1, 9999)),
+                onIncrease: () => setState(() => _rest = _rest! + 15),
+                onSkip: () {
+                  _rRef?.cancel();
+                  setState(() => _rest = null);
+                },
               ),
 
             // Exercise tabs
@@ -439,26 +506,43 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                   ..._exercises.asMap().entries.map((entry) {
                     final i = entry.key;
                     final e = entry.value;
-                    final d = (_logs[i] ?? []).where((s) => s['done'] == true).length;
+                    final d = (_logs[i] ?? [])
+                        .where((s) => s['done'] == true)
+                        .length;
                     final t = (_logs[i] ?? []).length;
                     final all = d == t && t > 0;
                     return Padding(
                       padding: const EdgeInsets.only(right: 7),
                       child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _cur = i;
-                            _exNoteC.text = _exNotes[i] ?? '';
-                          });
-                        },
+                        onTap: () => _selectExercise(i),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: _cur == i ? ApexColors.card : Colors.transparent,
-                            border: Border.all(color: _cur == i ? ApexColors.border : Colors.transparent),
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 11,
+                            vertical: 6,
                           ),
-                          child: Text('${all ? '✓ ' : ''}${e['name']}', style: TextStyle(color: all ? ApexColors.accent : (_cur == i ? ApexColors.t1 : ApexColors.t3), fontWeight: FontWeight.w700, fontSize: 10)),
+                          decoration: BoxDecoration(
+                            color: _cur == i
+                                ? ApexColors.card
+                                : Colors.transparent,
+                            border: Border.all(
+                              color: _cur == i
+                                  ? ApexColors.border
+                                  : Colors.transparent,
+                            ),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(8),
+                            ),
+                          ),
+                          child: Text(
+                            '${all ? '✓ ' : ''}${e['name']}',
+                            style: TextStyle(
+                              color: all
+                                  ? ApexColors.accent
+                                  : (_cur == i ? ApexColors.t1 : ApexColors.t3),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 10,
+                            ),
+                          ),
                         ),
                       ),
                     );
@@ -467,29 +551,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               ),
             ),
             Divider(color: ApexColors.border, height: 1),
-            
-            if (_smartTip != null)
-              Container(
-                margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: ApexColors.accent.withAlpha(20),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: ApexColors.accent.withAlpha(50)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.psychology_rounded, color: ApexColors.accent, size: 20),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _smartTip!,
-                        style: TextStyle(color: ApexColors.t1, fontSize: 11, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+
+            if (_smartTip != null) SmartTipBanner(message: _smartTip!),
 
             // Set logging
             Expanded(
@@ -498,151 +561,111 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                   : ListView(
                       padding: const EdgeInsets.all(16),
                       children: [
-                        Text(ex['name'] ?? '', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: ApexColors.t1)),
-                        Text('Edit each set independently', style: TextStyle(color: ApexColors.t2, fontSize: 10)),
+                        Text(
+                          ex['name'] ?? '',
+                          style: GoogleFonts.inter(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: ApexColors.t1,
+                          ),
+                        ),
+                        Text(
+                          'Edit each set independently',
+                          style: TextStyle(color: ApexColors.t2, fontSize: 10),
+                        ),
                         const SizedBox(height: 12),
                         // Header
-                        Row(children: [
-                          SizedBox(width: 34, child: Text('#', textAlign: TextAlign.center, style: TextStyle(fontSize: 9, color: ApexColors.t3, fontWeight: FontWeight.w700))),
-                          Expanded(child: Text('REPS', textAlign: TextAlign.center, style: TextStyle(fontSize: 9, color: ApexColors.t3, fontWeight: FontWeight.w700))),
-                          Expanded(child: Text('KG', textAlign: TextAlign.center, style: TextStyle(fontSize: 9, color: ApexColors.t3, fontWeight: FontWeight.w700))),
-                          const SizedBox(width: 40, child: Text('✓', textAlign: TextAlign.center, style: TextStyle(fontSize: 9, color: ApexColors.t3, fontWeight: FontWeight.w700))),
-                        ]),
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: 34,
+                              child: Text(
+                                '#',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: ApexColors.t3,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                'REPS',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: ApexColors.t3,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                'KG',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: ApexColors.t3,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(
+                              width: 40,
+                              child: Text(
+                                '✓',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: ApexColors.t3,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 5),
                         ...(_logs[_cur] ?? []).asMap().entries.map((entry) {
                           final si = entry.key;
                           final s = entry.value;
-                          final done = s['done'] == true;
-                          
-                          final prevSet = _previousSets.where((ps) => 
-                            ps['exercise_name'] == ex['name'] && ps['set_number'] == (si + 1)
-                          ).firstOrNull;
+                          final prevSet = _previousSetFor(ex['name'], si + 1);
                           final pReps = prevSet?['reps_done']?.toString() ?? '';
-                          final pWeight = prevSet?['weight_kg']?.toString() ?? '';
-
-                          final tVal = s['type'] as String? ?? 'normal';
-                          
-                          // Color-coded type badge
-                          final (tLabel, tColor) = switch (tVal) {
-                            'warmup' => ('W', ApexColors.yellow),
-                            'drop'   => ('D', ApexColors.blue),
-                            'failure'=> ('F', ApexColors.red),
-                            _        => ('${si + 1}', ApexColors.t3),
-                          };
-
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 7),
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: done ? ApexColors.accentDim : ApexColors.card,
-                              border: Border.all(color: done ? ApexColors.accent.withAlpha(64) : (tVal == 'warmup' ? ApexColors.yellow.withAlpha(60) : tVal == 'drop' ? ApexColors.blue.withAlpha(60) : ApexColors.border)),
-                              borderRadius: BorderRadius.circular(10),
+                          final pWeight =
+                              prevSet?['weight_kg']?.toString() ?? '';
+                          return WorkoutSetRow(
+                            key: ValueKey('$_cur-$si'),
+                            setNumber: si + 1,
+                            setData: s,
+                            previousReps: pReps,
+                            previousWeight: pWeight,
+                            deltaPercent: _deltaPercentForSet(
+                              ex['name'],
+                              si + 1,
+                              s,
                             ),
-                            child: Row(
-                              children: [
-                                // Type badge — tap to cycle
-                                SizedBox(
-                                  width: 34,
-                                  child: GestureDetector(
-                                    onTap: () => _toggleType(_cur, si),
-                                    child: Container(
-                                      width: 26, height: 26,
-                                      decoration: BoxDecoration(
-                                        color: done ? ApexColors.accent : tColor.withAlpha(28),
-                                        shape: BoxShape.circle,
-                                        border: Border.all(color: done ? ApexColors.accent : tColor.withAlpha(100)),
-                                      ),
-                                      child: Center(child: Text(
-                                        done ? '✓' : tLabel,
-                                        style: TextStyle(color: done ? ApexColors.bg : tColor, fontWeight: FontWeight.w800, fontSize: 11),
-                                      )),
-                                    ),
-                                  ),
-                                ),
-                                // Reps field
-                                Expanded(
-                                  child: TextField(
-                                    controller: TextEditingController(text: s['reps']?.toString() ?? ''),
-                                    onChanged: (v) => _upd(_cur, si, 'reps', v),
-                                    onTap: () => setState(() { _focusedEx = _cur; _focusedSet = si; }),
-                                    keyboardType: TextInputType.number,
-                                    textAlign: TextAlign.center,
-                                    style: ApexTheme.mono(size: 16),
-                                    decoration: InputDecoration(
-                                      hintText: pReps.isNotEmpty ? '$pReps' : '0',
-                                      hintStyle: ApexTheme.mono(size: 14, color: ApexColors.t3.withValues(alpha: 0.5)),
-                                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                                      filled: true, fillColor: ApexColors.surface,
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(7), borderSide: BorderSide(color: ApexColors.border)),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                // Weight field with plate calculator on long-press
-                                Expanded(
-                                  child: GestureDetector(
-                                    onLongPress: () {
-                                      HapticFeedback.mediumImpact();
-                                      final currentW = double.tryParse(s['weight']?.toString() ?? '0') ?? 0;
-                                      showPlateCalculator(context, initialWeight: currentW > 0 ? currentW : 60);
-                                    },
-                                    child: TextField(
-                                      controller: TextEditingController(text: s['weight']?.toString() ?? ''),
-                                      onChanged: (v) => _upd(_cur, si, 'weight', v),
-                                      onTap: () => setState(() { _focusedEx = _cur; _focusedSet = si; }),
-                                      keyboardType: TextInputType.number,
-                                      textAlign: TextAlign.center,
-                                      style: ApexTheme.mono(size: 16),
-                                      decoration: InputDecoration(
-                                        hintText: pWeight.isNotEmpty ? '$pWeight' : '0',
-                                        hintStyle: ApexTheme.mono(size: 14, color: ApexColors.t3.withValues(alpha: 0.5)),
-                                        contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                                        filled: true, fillColor: ApexColors.surface,
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(7), borderSide: BorderSide(color: ApexColors.border)),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                if (done) ...[
-                                  Builder(builder: (ctx) {
-                                    final p = _previousSets.where((ps) => ps['exercise_name'] == ex['name'] && ps['set_number'] == (si + 1)).firstOrNull;
-                                    if (p == null) return const SizedBox.shrink();
-                                    
-                                    final pV = (num.tryParse(p['reps_done']?.toString() ?? '') ?? 0) * (num.tryParse(p['weight_kg']?.toString() ?? '') ?? 0);
-                                    final cV = (num.tryParse(s['reps']?.toString() ?? '') ?? 0) * (num.tryParse(s['weight']?.toString() ?? '') ?? 0);
-                                    if (pV <= 0 || cV <= 0) return const SizedBox.shrink();
-                                    
-                                    final pct = ((cV - pV) / pV * 100).round();
-                                    if (pct == 0) return const SizedBox.shrink();
-                                    
-                                    final isUp = pct > 0;
-                                    final color = isUp ? ApexColors.accent : ApexColors.red;
-                                    return Container(
-                                      margin: const EdgeInsets.only(right: 6),
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                                      decoration: BoxDecoration(color: color.withAlpha(25), borderRadius: BorderRadius.circular(6), border: Border.all(color: color.withAlpha(60))),
-                                      child: Text(
-                                        '${isUp ? '↑' : '↓'}${pct.abs()}%',
-                                        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w800),
-                                      ),
-                                    );
-                                  }),
-                                ],
-                                GestureDetector(
-                                  onTap: () => _toggle(_cur, si),
-                                  child: Container(
-                                    width: 36, height: 36,
-                                    decoration: BoxDecoration(
-                                      color: done ? ApexColors.accent : ApexColors.surface,
-                                      border: Border.all(color: done ? ApexColors.accent : ApexColors.border, width: 1.5),
-                                      borderRadius: BorderRadius.circular(9),
-                                    ),
-                                    child: Center(child: Text(done ? '✓' : '○', style: TextStyle(color: done ? ApexColors.bg : ApexColors.t2, fontSize: 14))),
-                                  ),
-                                ),
-                              ],
-                            ),
+                            onToggleType: () => _toggleType(_cur, si),
+                            onRepsChanged: (v) => _upd(_cur, si, 'reps', v),
+                            onWeightChanged: (v) => _upd(_cur, si, 'weight', v),
+                            onFieldTap: () => setState(() {
+                              _focusedEx = _cur;
+                              _focusedSet = si;
+                            }),
+                            onWeightLongPress: () {
+                              HapticFeedback.mediumImpact();
+                              final currentWeight =
+                                  double.tryParse(
+                                    s['weight']?.toString() ?? '0',
+                                  ) ??
+                                  0;
+                              showPlateCalculator(
+                                context,
+                                initialWeight: currentWeight > 0
+                                    ? currentWeight
+                                    : 60,
+                              );
+                            },
+                            onToggleDone: () => _toggle(_cur, si),
                           );
                         }),
                         GestureDetector(
@@ -650,117 +673,178 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                           child: Container(
                             margin: const EdgeInsets.only(top: 9),
                             padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(border: Border.all(color: ApexColors.border, style: BorderStyle.solid), borderRadius: BorderRadius.circular(9)),
-                            child: Center(child: Text('Add set', style: TextStyle(color: ApexColors.t2, fontSize: 11, fontWeight: FontWeight.w700))),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: ApexColors.border,
+                                style: BorderStyle.solid,
+                              ),
+                              borderRadius: BorderRadius.circular(9),
+                            ),
+                            child: Center(
+                              child: Text(
+                                'Add set',
+                                style: TextStyle(
+                                  color: ApexColors.t2,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 24),
-                        Text('QUICK ADD (Set ${_focusedSet != null ? _focusedSet! + 1 : '-'})', style: TextStyle(color: ApexColors.t3, fontSize: 10, fontWeight: FontWeight.w700)),
+                        Text(
+                          'QUICK ADD (Set ${_focusedSet != null ? _focusedSet! + 1 : '-'})',
+                          style: TextStyle(
+                            color: ApexColors.t3,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                         const SizedBox(height: 8),
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: Row(
-                            children: [2.5, 5.0, 10.0, 15.0, 20.0, 25.0].map((v) => 
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: GestureDetector(
-                                  onTap: () {
-                                    if (_focusedEx != null && _focusedSet != null) {
-                                      final setMap = _logs[_focusedEx]![_focusedSet!];
-                                      final currentW = double.tryParse(setMap['weight']?.toString() ?? '0') ?? 0;
-                                      String newW = (currentW + v).toString();
-                                      if (newW.endsWith('.0')) newW = newW.substring(0, newW.length - 2);
-                                      _upd(_focusedEx!, _focusedSet!, 'weight', newW);
-                                    }
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                    decoration: BoxDecoration(color: ApexColors.surface, borderRadius: BorderRadius.circular(8), border: Border.all(color: ApexColors.border)),
-                                    child: Text('+$v', style: TextStyle(color: ApexColors.t1, fontWeight: FontWeight.w700, fontSize: 14)),
+                            children: [2.5, 5.0, 10.0, 15.0, 20.0, 25.0]
+                                .map(
+                                  (v) => Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        if (_focusedEx != null &&
+                                            _focusedSet != null) {
+                                          final setMap =
+                                              _logs[_focusedEx]![_focusedSet!];
+                                          final currentW =
+                                              double.tryParse(
+                                                setMap['weight']?.toString() ??
+                                                    '0',
+                                              ) ??
+                                              0;
+                                          String newW = (currentW + v)
+                                              .toString();
+                                          if (newW.endsWith('.0')) {
+                                            newW = newW.substring(
+                                              0,
+                                              newW.length - 2,
+                                            );
+                                          }
+                                          _upd(
+                                            _focusedEx!,
+                                            _focusedSet!,
+                                            'weight',
+                                            newW,
+                                          );
+                                        }
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 12,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: ApexColors.surface,
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          border: Border.all(
+                                            color: ApexColors.border,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          '+$v',
+                                          style: TextStyle(
+                                            color: ApexColors.t1,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
-                            ).toList(),
+                                )
+                                .toList(),
                           ),
                         ),
                         const SizedBox(height: 24),
                         TextField(
                           controller: _exNoteC,
-                          onChanged: (v) => _exNotes[_cur] = v,
+                          onChanged: (v) {
+                            _exNotes[_cur] = v;
+                            _saveState();
+                          },
                           maxLines: 2,
-                          style: GoogleFonts.inter(fontSize: 12, color: ApexColors.t1),
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: ApexColors.t1,
+                          ),
                           decoration: InputDecoration(
                             hintText: 'Notes for ${ex['name']}...',
-                            hintStyle: TextStyle(color: ApexColors.t3, fontSize: 12),
-                            filled: true, fillColor: ApexColors.surface,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: ApexColors.border)),
-                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: ApexColors.blue)),
+                            hintStyle: TextStyle(
+                              color: ApexColors.t3,
+                              fontSize: 12,
+                            ),
+                            filled: true,
+                            fillColor: ApexColors.surface,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(color: ApexColors.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(color: ApexColors.blue),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 10),
-                        Row(children: [
-                          if (_cur > 0) Expanded(child: ApexButton(text: 'Previous', icon: Icons.arrow_back_rounded, onPressed: () => setState(() => _cur--), outline: true, sm: true, full: true)),
-                          if (_cur > 0 && _cur < _exercises.length - 1) const SizedBox(width: 8),
-                          if (_cur < _exercises.length - 1) Expanded(child: ApexButton(text: 'Next', icon: Icons.arrow_forward_rounded, onPressed: () => setState(() => _cur++), sm: true, full: true)),
-                        ]),
+                        Row(
+                          children: [
+                            if (_cur > 0)
+                              Expanded(
+                                child: ApexButton(
+                                  text: 'Previous',
+                                  icon: Icons.arrow_back_rounded,
+                                  onPressed: () => _selectExercise(_cur - 1),
+                                  outline: true,
+                                  sm: true,
+                                  full: true,
+                                ),
+                              ),
+                            if (_cur > 0 && _cur < _exercises.length - 1)
+                              const SizedBox(width: 8),
+                            if (_cur < _exercises.length - 1)
+                              Expanded(
+                                child: ApexButton(
+                                  text: 'Next',
+                                  icon: Icons.arrow_forward_rounded,
+                                  onPressed: () => _selectExercise(_cur + 1),
+                                  sm: true,
+                                  full: true,
+                                ),
+                              ),
+                          ],
+                        ),
                       ],
                     ),
             ),
 
-            // Bottom bar
-            if (!_showEnd)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: ApexColors.surface, border: Border(top: BorderSide(color: ApexColors.border))),
-                child: ApexButton(text: 'Finish workout', icon: Icons.flag_rounded, onPressed: () => setState(() => _showEnd = true), full: true),
-              )
-            else
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: ApexColors.card, border: Border(top: BorderSide(color: ApexColors.border))),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Save this session?', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 12, color: ApexColors.t1)),
-                    Text('${_fmt(_timer)} · $_doneCount sets · ${_totalVol}kg', style: TextStyle(color: ApexColors.t2, fontSize: 10)),
-                    const SizedBox(height: 9),
-                    Text('INTENSITY', style: GoogleFonts.inter(fontSize: 10, color: ApexColors.t2, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 6),
-                    Row(children: [
-                      ['light', 'Light', ApexColors.accentSoft],
-                      ['moderate', 'Moderate', ApexColors.blue],
-                      ['heavy', 'Heavy', ApexColors.orange],
-                    ].map((i) => Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _intensity = i[0] as String),
-                        child: Container(
-                          margin: const EdgeInsets.only(right: 6),
-                          padding: const EdgeInsets.symmetric(vertical: 7),
-                          decoration: BoxDecoration(
-                            color: _intensity == i[0] ? (i[2] as Color).withAlpha(32) : ApexColors.surface,
-                            border: Border.all(color: _intensity == i[0] ? i[2] as Color : ApexColors.border, width: 1.5),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(i[1] as String, textAlign: TextAlign.center, style: TextStyle(color: _intensity == i[0] ? i[2] as Color : ApexColors.t2, fontSize: 10, fontWeight: FontWeight.w700)),
-                        ),
-                      ),
-                    )).toList()),
-                    const SizedBox(height: 9),
-                    TextField(
-                      onChanged: (v) => _notes = v,
-                      style: GoogleFonts.inter(fontSize: 13, color: ApexColors.t1),
-                      decoration: const InputDecoration(hintText: 'Session notes'),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(children: [
-                      Expanded(child: ApexButton(text: 'Back', onPressed: () => setState(() => _showEnd = false), outline: true, sm: true, full: true)),
-                      const SizedBox(width: 8),
-                      Expanded(child: ApexButton(text: 'Save and exit', icon: Icons.check_rounded, onPressed: _finish, full: true, loading: _saving)),
-                    ]),
-                  ],
-                ),
-              ),
+            SessionFooter(
+              showConfirmation: _showEnd,
+              saving: _saving,
+              elapsedLabel: _fmt(_timer),
+              doneCount: _doneCount,
+              totalVolume: _totalVol,
+              intensity: _intensity,
+              notesController: _sessionNotesC,
+              onBeginFinish: () => setState(() => _showEnd = true),
+              onCancelFinish: () => setState(() => _showEnd = false),
+              onSave: _finish,
+              onIntensityChanged: (value) => setState(() => _intensity = value),
+            ),
           ],
         ),
       ),

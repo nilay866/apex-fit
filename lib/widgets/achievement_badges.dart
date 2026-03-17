@@ -16,7 +16,7 @@ class AchievementBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = Color(int.parse(achievement.color));
-    
+
     return Container(
       width: 100,
       margin: const EdgeInsets.only(right: 16),
@@ -31,24 +31,26 @@ class AchievementBadge extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: unlocked 
-                  ? [color.withAlpha(200), color.withAlpha(100)]
-                  : [ApexColors.surface, ApexColors.border.withAlpha(100)],
+                colors: unlocked
+                    ? [color.withAlpha(200), color.withAlpha(100)]
+                    : [ApexColors.surface, ApexColors.border.withAlpha(100)],
               ),
               border: Border.all(
                 color: unlocked ? color : ApexColors.border,
                 width: 2,
               ),
-              boxShadow: unlocked ? [
-                BoxShadow(
-                  color: color.withAlpha(80),
-                  blurRadius: 15,
-                  spreadRadius: 2,
-                )
-              ] : null,
+              boxShadow: unlocked
+                  ? [
+                      BoxShadow(
+                        color: color.withAlpha(80),
+                        blurRadius: 15,
+                        spreadRadius: 2,
+                      ),
+                    ]
+                  : null,
             ),
             child: Icon(
-              IconData(AchievementService.getIconData(achievement.icon), fontFamily: 'MaterialIcons'),
+              _iconForAchievement(achievement.icon),
               color: unlocked ? Colors.white : ApexColors.t3,
               size: 32,
             ),
@@ -76,6 +78,23 @@ class AchievementBadge extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  IconData _iconForAchievement(String iconName) {
+    switch (iconName) {
+      case 'stars_rounded':
+        return Icons.stars_rounded;
+      case 'local_fire_department_rounded':
+        return Icons.local_fire_department_rounded;
+      case 'fitness_center_rounded':
+        return Icons.fitness_center_rounded;
+      case 'directions_run_rounded':
+        return Icons.directions_run_rounded;
+      case 'workspace_premium_rounded':
+        return Icons.workspace_premium_rounded;
+      default:
+        return Icons.stars_rounded;
+    }
   }
 }
 

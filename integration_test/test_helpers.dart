@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 const String qaEmail = String.fromEnvironment('QA_EMAIL');
 const String qaPassword = String.fromEnvironment('QA_PASSWORD');
+const String qaFriendQuery = String.fromEnvironment('QA_FRIEND_QUERY');
 
 void launchApp(WidgetTester tester) {
   if (qaEmail.isEmpty || qaPassword.isEmpty) {
@@ -18,12 +19,18 @@ void launchApp(WidgetTester tester) {
 Future<void> loginIfNeeded(WidgetTester tester) async {
   await pumpFor(tester, const Duration(seconds: 3));
   if (isPresent(find.text('Sign in'))) {
-    await tester.enterText(find.byType(TextField).at(0), qaEmail);
-    await tester.enterText(find.byType(TextField).at(1), qaPassword);
-    await tester.tap(find.text('Sign in').last);
+    await tester.enterText(
+      find.byKey(const ValueKey('auth_email_field')),
+      qaEmail,
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('auth_password_field')),
+      qaPassword,
+    );
+    await tester.tap(find.byKey(const ValueKey('auth_submit_button')));
     await tester.pump();
   }
-  await waitFor(tester, find.text('Home'));
+  await waitFor(tester, find.byKey(const ValueKey('nav_home')));
   await pumpFor(tester, const Duration(seconds: 2));
 }
 
@@ -36,7 +43,18 @@ Future<void> openProfile(WidgetTester tester) async {
         .first,
   );
   await tester.pump();
-  await waitFor(tester, find.text('Gym profile synced to your workspace.'));
+  await waitFor(tester, find.text('Goals'));
+}
+
+Future<void> tapNav(WidgetTester tester, String label) async {
+  final finder = find.byKey(ValueKey('nav_${label.toLowerCase()}'));
+  if (isPresent(finder)) {
+    await tester.tap(finder);
+  } else {
+    await tester.tap(find.text(label).first);
+  }
+  await tester.pump();
+  await pumpFor(tester, const Duration(milliseconds: 500));
 }
 
 Future<void> waitFor(

@@ -12,6 +12,7 @@ import '../widgets/apex_tag.dart';
 import '../widgets/apex_screen_header.dart';
 import '../widgets/apex_trend_chart.dart';
 import '../widgets/streak_calendar.dart';
+import '../repositories/workout_repository.dart';
 import '../services/ai_service.dart';
 import '../services/health_service.dart';
 import '../services/supabase_service.dart';
@@ -19,7 +20,6 @@ import '../services/cache_service.dart';
 import '../services/achievement_service.dart';
 import '../widgets/achievement_badges.dart';
 import 'workout_programs_screen.dart';
-
 
 class HomeScreen extends StatefulWidget {
   final Map<String, dynamic>? profile;
@@ -41,7 +41,6 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _enrollments = [];
   List<Achievement> _unlockedAchievements = [];
 
-
   // Statistical Notifiers for surgical UI updates
   late final ValueNotifier<int> _waterNotifier;
   late final ValueNotifier<int> _stepsNotifier;
@@ -55,23 +54,31 @@ class _HomeScreenState extends State<HomeScreen> {
   String _waterAmt = '250';
   bool _savingWater = false;
   String? _waterError;
+  Timer? _offlineSyncTimer;
 
   @override
   void initState() {
     super.initState();
     // Synchronous hydration from cache for sub-20ms TTI
-    _logs = cache.get<List<Map<String, dynamic>>>(CacheService.keyHomeLogs) ?? [];
-    _workouts = cache.get<List<Map<String, dynamic>>>(CacheService.keyHomeWorkouts) ?? [];
-    _waterLogs = cache.get<List<Map<String, dynamic>>>(CacheService.keyWaterLogs) ?? [];
-    
+    _logs =
+        cache.get<List<Map<String, dynamic>>>(CacheService.keyHomeLogs) ?? [];
+    _workouts =
+        cache.get<List<Map<String, dynamic>>>(CacheService.keyHomeWorkouts) ??
+        [];
+    _waterLogs =
+        cache.get<List<Map<String, dynamic>>>(CacheService.keyWaterLogs) ?? [];
+
     _waterNotifier = ValueNotifier<int>(_calculateTotalWater(_waterLogs));
     _stepsNotifier = ValueNotifier<int>(0);
     _energyNotifier = ValueNotifier<double>(0.0);
     _calorieNotifier = ValueNotifier<int>(0);
 
     // Phase 14: Background Sync Trigger
-    SupabaseService.syncOfflineWorkouts();
-    Timer.periodic(const Duration(minutes: 5), (_) => SupabaseService.syncOfflineWorkouts());
+    unawaited(workoutRepository.syncOfflineQueue());
+    _offlineSyncTimer = Timer.periodic(
+      const Duration(minutes: 5),
+      (_) => unawaited(workoutRepository.syncOfflineQueue()),
+    );
 
     _load();
   }
@@ -82,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _offlineSyncTimer?.cancel();
     _waterNotifier.dispose();
     _stepsNotifier.dispose();
     _energyNotifier.dispose();
@@ -95,21 +103,27 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() => _loading = true);
     }
 
-    final userId = SupabaseService.currentUser!.id;
-    final todayStr = DateTime.now().toIso8601String().split('T')[0];
-    
     try {
+      final userId = SupabaseService.requireUserId(
+        action: 'load your dashboard',
+      );
+      final todayStr = DateTime.now().toIso8601String().split('T')[0];
       final results = await Future.wait([
         SupabaseService.getWorkoutLogs(userId, limit: 14),
         SupabaseService.getWorkouts(userId),
-        SupabaseService.getNutritionLogs(userId, since: DateTime.parse('${todayStr}T00:00:00')),
+        SupabaseService.getNutritionLogs(
+          userId,
+          since: DateTime.parse('${todayStr}T00:00:00'),
+        ),
         SupabaseService.getBodyWeightLogs(userId, limit: 3),
         SupabaseService.getProgressPhotos(userId),
-        SupabaseService.getWaterLogs(userId, since: DateTime.parse('${todayStr}T00:00:00')),
+        SupabaseService.getWaterLogs(
+          userId,
+          since: DateTime.parse('${todayStr}T00:00:00'),
+        ),
         SupabaseService.getUserEnrollments(userId),
       ]);
 
-      
       final healthData = await HealthService.fetchDailySummary();
 
       if (!mounted) return;
@@ -122,26 +136,33 @@ class _HomeScreenState extends State<HomeScreen> {
         _bwLogs = results[3];
         _photos = results[4];
         _waterLogs = results[5];
-        _enrollments = (results.length > 6) ? results[6] as List<Map<String, dynamic>> : [];
+        _enrollments = results.length > 6
+            ? List<Map<String, dynamic>>.from(results[6] as List)
+            : [];
         _loading = false;
 
         // Calculate Achievements
-        AchievementService.checkAchievements(_logs, _streak).then((achievements) {
+        AchievementService.checkAchievements(_logs, _streak).then((
+          achievements,
+        ) {
           if (mounted) setState(() => _unlockedAchievements = achievements);
         });
-        
+
         // Update notifiers without triggering full rebuild
         _waterNotifier.value = _calculateTotalWater(_waterLogs);
         _stepsNotifier.value = healthData['steps'] as int;
         _energyNotifier.value = healthData['energy'] as double;
-        _calorieNotifier.value = _nutritionLogs.fold(0, (sum, l) => sum + (l['calories'] as int? ?? 0));
-        
+        _calorieNotifier.value = _nutritionLogs.fold(
+          0,
+          (sum, l) => sum + (l['calories'] as int? ?? 0),
+        );
+
         // Sync to Holographic Cache
         cache.setList(CacheService.keyHomeLogs, _logs);
         cache.setList(CacheService.keyHomeWorkouts, _workouts);
         cache.setList(CacheService.keyWaterLogs, _waterLogs);
       });
-      
+
       _loadSuggestion();
     } catch (e) {
       if (mounted) setState(() => _loading = false);
@@ -198,21 +219,23 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _loading = true);
 
     try {
-      final bytes = await FlutterImageCompress.compressWithFile(
-        file.path,
-        quality: 60,
-        minWidth: 800,
-        minHeight: 800,
-        format: CompressFormat.jpeg,
-      ) ?? await file.readAsBytes();
-      
+      final bytes =
+          await FlutterImageCompress.compressWithFile(
+            file.path,
+            quality: 60,
+            minWidth: 800,
+            minHeight: 800,
+            format: CompressFormat.jpeg,
+          ) ??
+          await file.readAsBytes();
+
       final base64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
       await SupabaseService.createProgressPhoto(
-        SupabaseService.currentUser!.id,
+        SupabaseService.requireUserId(action: 'save a progress photo'),
         base64,
         null, // Optional caption could be added later
       );
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -252,7 +275,11 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Text(
               'Capture Progress',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18, color: ApexColors.t1),
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+                color: ApexColors.t1,
+              ),
             ),
             const SizedBox(height: 20),
             Row(
@@ -291,6 +318,18 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _openLogMealSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: ApexColors.surfaceStrong,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      builder: (sheetContext) => _LogMealSheet(onLogged: _load),
+    );
+  }
+
   Future<void> _logWater() async {
     final ml = int.tryParse(_waterAmt);
     if (ml == null || ml <= 0) return;
@@ -300,7 +339,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
     try {
       final log = await SupabaseService.createWaterLog(
-        SupabaseService.currentUser!.id,
+        SupabaseService.requireUserId(action: 'log water'),
         ml,
       );
       if (!mounted) return;
@@ -309,7 +348,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _waterLogs = [..._waterLogs, log];
       _waterNotifier.value = _calculateTotalWater(_waterLogs);
       cache.setList(CacheService.keyWaterLogs, _waterLogs);
-      
+
       setState(() {
         _waterAmt = '250';
         _waterError = null;
@@ -378,7 +417,7 @@ class _HomeScreenState extends State<HomeScreen> {
       onRefresh: _load,
       color: ApexColors.accent,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
         children: [
           ApexScreenHeader(
             eyebrow: 'Dashboard',
@@ -414,7 +453,7 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 7,
             runSpacing: 7,
@@ -424,7 +463,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ApexTag(text: '${latestBW}kg', color: ApexColors.blue),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -432,18 +471,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: ValueListenableBuilder<int>(
                   valueListenable: _calorieNotifier,
                   builder: (context, val, _) {
-                    return _statCard(
-                      'Calories',
-                      val,
-                      calGoal,
-                      Icons.local_fire_department_rounded,
-                      ApexColors.orange,
-                      'kcal',
+                    return GestureDetector(
+                      onTap: _openLogMealSheet,
+                      child: _statCard(
+                        'Calories',
+                        val,
+                        calGoal,
+                        Icons.local_fire_department_rounded,
+                        ApexColors.orange,
+                        'kcal',
+                      ),
                     );
                   },
                 ),
               ),
-              const SizedBox(width: 9),
+              const SizedBox(width: 8),
               Expanded(
                 child: ValueListenableBuilder<int>(
                   valueListenable: _waterNotifier,
@@ -454,7 +496,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           if (_addWater) _buildWaterInput(),
           if (_waterError != null) ...[
             ApexCard(
@@ -467,10 +509,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
           ],
           _buildProgramsCard(),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
           ApexCard(
             glow: true,
@@ -548,7 +590,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 if (suggestedWorkout != null) ...[
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   ApexButton(
                     text: 'Start ${suggestedWorkout['name']}',
                     icon: Icons.play_arrow_rounded,
@@ -559,13 +601,17 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           _journeyGallery(journeyStages),
-          const SizedBox(height: 14),
+          if (_unlockedAchievements.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            AchievementList(unlockedAchievements: _unlockedAchievements),
+          ],
+          const SizedBox(height: 12),
           RepaintBoundary(
             child: StreakCalendar(logs: _logs, photos: _photos),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           ApexCard(
             glow: true,
             glowColor: ApexColors.blue,
@@ -618,7 +664,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 RepaintBoundary(
                   child: ApexTrendChart(
                     values: weeklyVolume,
@@ -630,7 +676,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Wrap(
             alignment: WrapAlignment.center,
             spacing: 12,
@@ -682,7 +728,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Text(
             'Recent sessions',
             style: GoogleFonts.inter(
@@ -772,10 +818,12 @@ class _HomeScreenState extends State<HomeScreen> {
     String unit,
   ) {
     final pct = goal > 0 ? (val / goal).clamp(0.0, 1.0) : 0.0;
-    return ApexCard(
+    return SizedBox(
+      height: 140,
+      child: ApexCard(
       glow: true,
       glowColor: color,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -818,8 +866,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               Container(
-                width: 42,
-                height: 42,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
                   color: color.withAlpha(18),
                   borderRadius: BorderRadius.circular(16),
@@ -832,7 +880,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               ClipRRect(
                 borderRadius: BorderRadius.circular(99),
                 child: LinearProgressIndicator(
@@ -842,7 +890,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   valueColor: AlwaysStoppedAnimation(color),
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 '${(pct * 100).round()}% of goal',
                 style: const TextStyle(fontSize: 10, color: ApexColors.t3),
@@ -851,6 +899,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+      ),
     );
   }
 
@@ -858,93 +907,100 @@ class _HomeScreenState extends State<HomeScreen> {
     final pct = goal > 0 ? (total / goal).clamp(0.0, 1.0) : 0.0;
     return GestureDetector(
       onTap: () => setState(() => _addWater = true),
-      child: ApexCard(
-        glow: true,
-        glowColor: ApexColors.blue,
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'HYDRATION',
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          color: ApexColors.t3,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
+      child: SizedBox(
+        height: 140,
+        child: ApexCard(
+          glow: true,
+          glowColor: ApexColors.blue,
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'HYDRATION',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            color: ApexColors.t3,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 0.8,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      RichText(
-                        text: TextSpan(
-                          children: [
-                            TextSpan(
-                              text: _loading
-                                  ? '—'
-                                  : (total / 1000).toStringAsFixed(1),
-                              style: ApexTheme.mono(
-                                size: 22,
-                                color: ApexColors.blue,
+                        const SizedBox(height: 4),
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              TextSpan(
+                                text: _loading
+                                    ? '—'
+                                    : (total / 1000).toStringAsFixed(1),
+                                style: ApexTheme.mono(
+                                  size: 22,
+                                  color: ApexColors.blue,
+                                ),
                               ),
-                            ),
-                            TextSpan(
-                              text: '/${(goal / 1000).toStringAsFixed(1)}L',
-                              style: ApexTheme.mono(
-                                size: 9,
-                                color: ApexColors.t3,
+                              TextSpan(
+                                text: '/${(goal / 1000).toStringAsFixed(1)}L',
+                                style: ApexTheme.mono(
+                                  size: 9,
+                                  color: ApexColors.t3,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: ApexColors.blue.withAlpha(18),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: ApexColors.blue.withAlpha(60)),
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: ApexColors.blue.withAlpha(18),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: ApexColors.blue.withAlpha(60)),
+                    ),
+                    child: const Icon(
+                      Icons.water_drop_rounded,
+                      size: 20,
+                      color: ApexColors.blue,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.water_drop_rounded,
-                    size: 20,
-                    color: ApexColors.blue,
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(99),
+                    child: LinearProgressIndicator(
+                      value: pct,
+                      minHeight: 7,
+                      backgroundColor: ApexColors.cardAlt,
+                      valueColor: const AlwaysStoppedAnimation(ApexColors.blue),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 16),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(99),
-                  child: LinearProgressIndicator(
-                    value: pct,
-                    minHeight: 7,
-                    backgroundColor: ApexColors.cardAlt,
-                    valueColor: const AlwaysStoppedAnimation(ApexColors.blue),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tap to track',
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      color: ApexColors.blue,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Tap to track',
-                  style: GoogleFonts.inter(fontSize: 10, color: ApexColors.blue, fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1068,7 +1124,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Start, midpoint, and current photos in one responsive strip.',
+                      'Start and current photos in one responsive strip.',
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         color: ApexColors.t2,
@@ -1077,23 +1133,26 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: ApexColors.pink.withAlpha(16),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: ApexColors.pink.withAlpha(56)),
-                ),
-                child: const Icon(
-                  Icons.photo_library_rounded,
-                  color: ApexColors.pink,
-                  size: 19,
+              GestureDetector(
+                onTap: _showAddPhotoSource,
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: ApexColors.pink.withAlpha(16),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: ApexColors.pink.withAlpha(56)),
+                  ),
+                  child: const Icon(
+                    Icons.photo_library_rounded,
+                    color: ApexColors.pink,
+                    size: 19,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           if (!hasAny)
             Container(
               width: double.infinity,
@@ -1147,7 +1206,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final dateLabel = _formatLongDate(stage.photo?['taken_at']?.toString());
 
     return InkWell(
-      onTap: _showAddPhotoSource,
+      onTap: photoData == null ? _showAddPhotoSource : () => _showPhotoDialog(photoData, dateLabel),
       borderRadius: BorderRadius.circular(24),
       child: Container(
         width: 152,
@@ -1160,7 +1219,9 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(23)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(23),
+              ),
               child: SizedBox(
                 height: 172,
                 width: double.infinity,
@@ -1237,13 +1298,65 @@ class _HomeScreenState extends State<HomeScreen> {
       return Image.memory(
         base64Decode(base64Str),
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(color: ApexColors.cardAlt),
+        errorBuilder: (context, error, stackTrace) =>
+            Container(color: ApexColors.cardAlt),
       );
     }
     return Image.network(
       data,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(color: ApexColors.cardAlt),
+      errorBuilder: (context, error, stackTrace) =>
+          Container(color: ApexColors.cardAlt),
+    );
+  }
+
+  void _showPhotoDialog(String data, String dateLabel) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: InteractiveViewer(
+                child: _buildPhoto(data),
+              ),
+            ),
+            Positioned(
+              top: 16,
+              right: 16,
+              child: GestureDetector(
+                onTap: () => Navigator.pop(ctx),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 16,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  dateLabel,
+                  style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1361,11 +1474,6 @@ class _HomeScreenState extends State<HomeScreen> {
           color: ApexColors.orange,
         ),
         _JourneyPhotoStage(
-          label: 'Midpoint',
-          dayLabel: 'Halfway',
-          color: ApexColors.blue,
-        ),
-        _JourneyPhotoStage(
           label: 'Current',
           dayLabel: 'Today',
           color: ApexColors.accentSoft,
@@ -1386,41 +1494,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final currentDate = _photoDate(current) ?? DateTime.now();
     final totalDays = currentDate.difference(startDate).inDays.abs();
 
-    Map<String, dynamic>? mid;
-    if (ordered.length >= 3) {
-      final midpoint = startDate.add(Duration(days: (totalDays / 2).round()));
-      mid = ordered.reduce((best, candidate) {
-        final bestDiff = (_photoDate(best) ?? midpoint)
-            .difference(midpoint)
-            .inDays
-            .abs();
-        final candidateDiff = (_photoDate(candidate) ?? midpoint)
-            .difference(midpoint)
-            .inDays
-            .abs();
-        return candidateDiff < bestDiff ? candidate : best;
-      });
-      if (mid['id'] == start['id'] || mid['id'] == current['id']) {
-        mid = ordered[ordered.length ~/ 2];
-      }
-    }
-
     stages.add(
       _JourneyPhotoStage(
         label: 'Start',
         dayLabel: 'Day 1',
         color: ApexColors.orange,
         photo: start,
-      ),
-    );
-    stages.add(
-      _JourneyPhotoStage(
-        label: 'Midpoint',
-        dayLabel: mid == null
-            ? 'Add more'
-            : 'Day ${((_photoDate(mid) ?? startDate).difference(startDate).inDays) + 1}',
-        color: ApexColors.blue,
-        photo: mid,
       ),
     );
     stages.add(
@@ -1474,10 +1553,14 @@ class _HomeScreenState extends State<HomeScreen> {
       return 'Saved photo';
     }
   }
+
   Widget _buildProgramsCard() {
     if (_enrollments.isEmpty) {
       return GestureDetector(
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WorkoutProgramsScreen())),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const WorkoutProgramsScreen()),
+        ),
         child: ApexCard(
           child: Row(
             children: [
@@ -1485,19 +1568,37 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: 50,
                 height: 50,
                 decoration: BoxDecoration(
-                  color: ApexColors.accent.withOpacity(0.1),
+                  color: ApexColors.accent.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Icon(Icons.auto_graph_rounded, color: ApexColors.accent),
+                child: const Icon(
+                  Icons.auto_graph_rounded,
+                  color: ApexColors.accent,
+                ),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('structured programs'.toUpperCase(), style: TextStyle(color: ApexColors.t3, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                    Text(
+                      'structured programs'.toUpperCase(),
+                      style: TextStyle(
+                        color: ApexColors.t3,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text('Accelerate your results', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 16, color: ApexColors.t1)),
+                    Text(
+                      'Accelerate your results',
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        color: ApexColors.t1,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1513,7 +1614,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final day = active['current_day'] ?? 1;
 
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const WorkoutProgramsScreen())),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const WorkoutProgramsScreen()),
+      ),
       child: ApexCard(
         glow: true,
         glowColor: ApexColors.accent,
@@ -1526,9 +1630,24 @@ class _HomeScreenState extends State<HomeScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('ACTIVE PROGRAM', style: TextStyle(color: ApexColors.t3, fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                    Text(
+                      'ACTIVE PROGRAM',
+                      style: TextStyle(
+                        color: ApexColors.t3,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text(program?['name'] ?? 'Training Program', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 20, color: ApexColors.t1)),
+                    Text(
+                      program?['name'] ?? 'Training Program',
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 20,
+                        color: ApexColors.t1,
+                      ),
+                    ),
                   ],
                 ),
                 ApexTag(text: 'DAY $day', color: ApexColors.accent),
@@ -1551,7 +1670,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-
 class _JourneyPhotoStage {
   final String label;
   final String dayLabel;
@@ -1564,4 +1682,219 @@ class _JourneyPhotoStage {
     required this.color,
     this.photo,
   });
+}
+
+class _LogMealSheet extends StatefulWidget {
+  final VoidCallback onLogged;
+  const _LogMealSheet({required this.onLogged});
+
+  @override
+  State<_LogMealSheet> createState() => _LogMealSheetState();
+}
+
+class _LogMealSheetState extends State<_LogMealSheet> {
+  final _foodController = TextEditingController();
+  final _caloriesController = TextEditingController();
+  final _proteinController = TextEditingController();
+  final _carbsController = TextEditingController();
+  final _fatController = TextEditingController();
+
+  bool _loadingAI = false;
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _foodController.dispose();
+    _caloriesController.dispose();
+    _proteinController.dispose();
+    _carbsController.dispose();
+    _fatController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _lookupMacros() async {
+    final food = _foodController.text.trim();
+    if (food.isEmpty) return;
+
+    setState(() => _loadingAI = true);
+    try {
+      final res = await AIService.lookupNutrition(food, '');
+      if (mounted) {
+        setState(() {
+          if (res['calories'] != null) {
+            _caloriesController.text = res['calories'].toString();
+          }
+          if (res['protein_g'] != null) {
+            _proteinController.text = res['protein_g'].toString();
+          }
+          if (res['carbs_g'] != null) {
+            _carbsController.text = res['carbs_g'].toString();
+          }
+          if (res['fat_g'] != null) _fatController.text = res['fat_g'].toString();
+        });
+      }
+    } catch (_) {
+      // Silent fail
+    } finally {
+      if (mounted) setState(() => _loadingAI = false);
+    }
+  }
+
+  Future<void> _logMeal() async {
+    if (_foodController.text.trim().isEmpty) return;
+
+    setState(() => _saving = true);
+    try {
+      final userId = SupabaseService.requireUserId(action: 'log a meal');
+      await SupabaseService.createNutritionLog({
+        'user_id': userId,
+        'meal_name': _foodController.text.trim(),
+        'calories': int.tryParse(_caloriesController.text) ?? 0,
+        'protein_g': double.tryParse(_proteinController.text) ?? 0,
+        'carbs_g': double.tryParse(_carbsController.text) ?? 0,
+        'fat_g': double.tryParse(_fatController.text) ?? 0,
+      });
+
+      widget.onLogged();
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to log meal: $e'),
+            backgroundColor: ApexColors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+        left: 16,
+        right: 16,
+        top: 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Log a Meal',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  color: ApexColors.t1,
+                ),
+              ),
+              if (_loadingAI)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: ApexColors.accent,
+                  ),
+                )
+              else
+                IconButton(
+                  onPressed: _lookupMacros,
+                  icon: const Icon(
+                    Icons.auto_awesome_rounded,
+                    color: ApexColors.accent,
+                    size: 20,
+                  ),
+                  tooltip: 'Auto-fill macros',
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildTextField(_foodController, 'Food Name'),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildTextField(
+                  _caloriesController,
+                  'Calories',
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildTextField(
+                  _proteinController,
+                  'Protein (g)',
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildTextField(
+                  _carbsController,
+                  'Carbs (g)',
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildTextField(
+                  _fatController,
+                  'Fat (g)',
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          ApexButton(
+            text: 'Log Meal',
+            loading: _saving,
+            onPressed: _logMeal,
+            full: true,
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextField(TextEditingController controller, String label,
+      {TextInputType keyboardType = TextInputType.text}) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      style: const TextStyle(color: ApexColors.t1),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: ApexColors.t3),
+        filled: true,
+        fillColor: ApexColors.surfaceStrong,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: ApexColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: ApexColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: ApexColors.accent),
+        ),
+      ),
+    );
+  }
 }

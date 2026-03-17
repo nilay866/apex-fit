@@ -260,7 +260,7 @@ class _DotState extends State<_Dot> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _c,
-      builder: (_, __) => Container(
+      builder: (context, _) => Container(
         width: 5, height: 5,
         margin: const EdgeInsets.symmetric(horizontal: 2),
         decoration: BoxDecoration(color: ApexColors.t2.withAlpha((_c.value * 255).round()), shape: BoxShape.circle),

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
@@ -9,11 +10,10 @@ void main() {
   testWidgets('capture stats screen', (WidgetTester tester) async {
     launchApp(tester);
     await loginIfNeeded(tester);
-    await tester.tap(find.text('Stats').first);
-    await tester.pumpAndSettle();
-    await waitFor(tester, find.text('Body Weight'));
+    await tapNav(tester, 'Stats');
+    await waitFor(tester, find.text('Achievement board'));
     await pumpFor(tester, const Duration(seconds: 1));
-    print('CAPTURE stats: screenshot start');
-    await binding.takeScreenshot('09-stats-screen');
+    debugPrint('CAPTURE stats: screenshot start');
+    await binding.takeScreenshot('05-stats-screen');
   });
 }

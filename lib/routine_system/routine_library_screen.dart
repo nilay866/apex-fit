@@ -47,7 +47,7 @@ class _RoutineLibraryScreenState extends State<RoutineLibraryScreen> {
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1C1C1F),
+        backgroundColor: ApexColors.surface,
         title: Text('New Routine', style: GoogleFonts.inter(color: ApexColors.t1, fontWeight: FontWeight.w800)),
         content: TextField(
           controller: ctrl,
@@ -56,13 +56,17 @@ class _RoutineLibraryScreenState extends State<RoutineLibraryScreen> {
           decoration: InputDecoration(
             hintText: 'e.g. Push Day A',
             hintStyle: TextStyle(color: ApexColors.t3),
-            filled: true, fillColor: ApexColors.surface,
+            filled: true, fillColor: ApexColors.bg,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: ApexColors.border)),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: TextStyle(color: ApexColors.t3))),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: TextStyle(color: ApexColors.t2))),
           TextButton(
+            style: TextButton.styleFrom(
+              backgroundColor: ApexColors.accent.withAlpha(20),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ),
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
             child: Text('Create', style: TextStyle(color: ApexColors.accent, fontWeight: FontWeight.w800)),
           ),

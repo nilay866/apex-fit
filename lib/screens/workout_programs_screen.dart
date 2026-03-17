@@ -38,7 +38,7 @@ class _WorkoutProgramsScreenState extends State<WorkoutProgramsScreen> {
 
     Haptics.vibrate(HapticsType.medium);
     await SupabaseService.enrollInProgram(userId, programId);
-    
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -56,21 +56,29 @@ class _WorkoutProgramsScreenState extends State<WorkoutProgramsScreen> {
       appBar: AppBar(
         backgroundColor: ApexColors.bg,
         elevation: 0,
-        title: Text('Programs', style: GoogleFonts.inter(fontWeight: FontWeight.w800, color: ApexColors.t1)),
+        title: Text(
+          'Programs',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w800,
+            color: ApexColors.t1,
+          ),
+        ),
         iconTheme: const IconThemeData(color: ApexColors.t1),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: ApexColors.accent))
+          ? const Center(
+              child: CircularProgressIndicator(color: ApexColors.accent),
+            )
           : _programs.isEmpty
-              ? _buildEmptyState()
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _programs.length,
-                  itemBuilder: (ctx, i) {
-                    final p = _programs[i];
-                    return _buildProgramCard(p);
-                  },
-                ),
+          ? _buildEmptyState()
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: _programs.length,
+              itemBuilder: (ctx, i) {
+                final p = _programs[i];
+                return _buildProgramCard(p);
+              },
+            ),
     );
   }
 
@@ -79,11 +87,21 @@ class _WorkoutProgramsScreenState extends State<WorkoutProgramsScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.auto_graph, size: 64, color: ApexColors.t3.withOpacity(0.3)),
+          Icon(
+            Icons.auto_graph,
+            size: 64,
+            color: ApexColors.t3.withValues(alpha: 0.3),
+          ),
           const SizedBox(height: 16),
-          Text('No programs available yet.', style: TextStyle(color: ApexColors.t2, fontSize: 16)),
+          Text(
+            'No programs available yet.',
+            style: TextStyle(color: ApexColors.t2, fontSize: 16),
+          ),
           const SizedBox(height: 8),
-          Text('Check back soon for AI-generated plans.', style: TextStyle(color: ApexColors.t3, fontSize: 14)),
+          Text(
+            'Check back soon for AI-generated plans.',
+            style: TextStyle(color: ApexColors.t3, fontSize: 14),
+          ),
         ],
       ),
     );
@@ -97,7 +115,11 @@ class _WorkoutProgramsScreenState extends State<WorkoutProgramsScreen> {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: ApexColors.border),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
@@ -109,11 +131,16 @@ class _WorkoutProgramsScreenState extends State<WorkoutProgramsScreen> {
             width: double.infinity,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [ApexColors.accent.withOpacity(0.8), ApexColors.blue.withOpacity(0.6)],
+                colors: [
+                  ApexColors.accent.withValues(alpha: 0.8),
+                  ApexColors.blue.withValues(alpha: 0.6),
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
             ),
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -121,25 +148,37 @@ class _WorkoutProgramsScreenState extends State<WorkoutProgramsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     p['difficulty']?.toUpperCase() ?? 'INTERMEDIATE',
-                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   p['name'] ?? 'Training Program',
-                  style: GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white),
+                  style: GoogleFonts.inter(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
                 ),
               ],
             ),
           ),
-          
+
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -147,14 +186,24 @@ class _WorkoutProgramsScreenState extends State<WorkoutProgramsScreen> {
               children: [
                 Text(
                   p['description'] ?? 'No description available.',
-                  style: TextStyle(color: ApexColors.t2, fontSize: 14, height: 1.4),
+                  style: TextStyle(
+                    color: ApexColors.t2,
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
                 ),
                 const SizedBox(height: 20),
                 Row(
                   children: [
-                    _buildMetaInfo(Icons.calendar_today, '${p['duration_weeks'] ?? 4} Weeks'),
+                    _buildMetaInfo(
+                      Icons.calendar_today,
+                      '${p['duration_weeks'] ?? 4} Weeks',
+                    ),
                     const SizedBox(width: 16),
-                    _buildMetaInfo(Icons.flash_on, 'Level: ${p['difficulty'] ?? 'All'}'),
+                    _buildMetaInfo(
+                      Icons.flash_on,
+                      'Level: ${p['difficulty'] ?? 'All'}',
+                    ),
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -166,10 +215,18 @@ class _WorkoutProgramsScreenState extends State<WorkoutProgramsScreen> {
                       backgroundColor: ApexColors.accent,
                       foregroundColor: ApexColors.bg,
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                       elevation: 0,
                     ),
-                    child: const Text('ENROLL IN PROGRAM', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
+                    child: const Text(
+                      'ENROLL IN PROGRAM',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -185,7 +242,14 @@ class _WorkoutProgramsScreenState extends State<WorkoutProgramsScreen> {
       children: [
         Icon(icon, size: 16, color: ApexColors.t3),
         const SizedBox(width: 6),
-        Text(label, style: TextStyle(color: ApexColors.t3, fontSize: 13, fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          style: TextStyle(
+            color: ApexColors.t3,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     );
   }

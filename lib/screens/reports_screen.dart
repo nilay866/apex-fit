@@ -40,14 +40,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
     });
   }
 
-  int get _days => {'day': 1, 'week': 7, 'month': 30, 'year': 365}[_period] ?? 7;
+  int get _days =>
+      {'day': 1, 'week': 7, 'month': 30, 'year': 365}[_period] ?? 7;
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final userId = SupabaseService.currentUser!.id;
-    final since = DateTime.now().subtract(Duration(days: _days));
-    final waterFuture = SupabaseService.getWaterLogs(userId, since: since);
     try {
+      final userId = SupabaseService.requireUserId(action: 'load your reports');
+      final since = DateTime.now().subtract(Duration(days: _days));
+      final waterFuture = SupabaseService.getWaterLogs(userId, since: since);
       final results = await Future.wait([
         SupabaseService.getWorkoutLogsSince(userId, since),
         SupabaseService.getNutritionLogs(userId, since: since),
@@ -60,6 +61,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       } catch (e) {
         waterError = SupabaseService.describeError(e);
       }
+      if (!mounted) return;
       setState(() {
         _wLogs = results[0];
         _nLogs = results[1];
@@ -69,7 +71,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
         _loading = false;
       });
     } catch (e) {
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
@@ -77,10 +81,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final w = double.tryParse(_bwC.text);
     if (w == null) return;
     setState(() => _savingBw = true);
-    
+
     try {
-      await SupabaseService.createBodyWeightLog(SupabaseService.currentUser!.id, w);
-      final bw = await SupabaseService.getBodyWeightLogs(SupabaseService.currentUser!.id);
+      final userId = SupabaseService.requireUserId(action: 'log body weight');
+      await SupabaseService.createBodyWeightLog(userId, w);
+      final bw = await SupabaseService.getBodyWeightLogs(userId);
       if (mounted) {
         setState(() {
           _bwLogs = bw;
@@ -105,8 +110,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final totalVol = _wLogs.fold<int>(0, (a, l) => a + ((l['total_volume'] as num?)?.round() ?? 0));
-    final totalCal = _nLogs.fold<int>(0, (a, l) => a + ((l['calories'] as int?) ?? 0));
+    final totalVol = _wLogs.fold<int>(
+      0,
+      (a, l) => a + ((l['total_volume'] as num?)?.round() ?? 0),
+    );
+    final totalCal = _nLogs.fold<int>(
+      0,
+      (a, l) => a + ((l['calories'] as int?) ?? 0),
+    );
     final mealDays = _nLogs
         .map((l) => l['logged_at']?.toString().split('T')[0])
         .whereType<String>()
@@ -114,25 +125,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
         .length;
     final avgCal = mealDays > 0 ? (totalCal / mealDays).round() : 0;
     final avgWater = _waterLogs.isNotEmpty
-        ? (_waterLogs.fold<int>(0, (a, w) => a + ((w['amount_ml'] as int?) ?? 0)) /
-                (_waterLogs
-                    .map((w) => w['logged_at']?.toString().split('T')[0])
-                    .toSet()
-                    .length
-                    .clamp(1, 999)))
-            .round()
+        ? (_waterLogs.fold<int>(
+                    0,
+                    (a, w) => a + ((w['amount_ml'] as int?) ?? 0),
+                  ) /
+                  (_waterLogs
+                      .map((w) => w['logged_at']?.toString().split('T')[0])
+                      .toSet()
+                      .length
+                      .clamp(1, 999)))
+              .round()
         : 0;
 
-    final workoutValues = _buildDailyValues(
-      _wLogs,
-      'completed_at',
-      (_) => 1,
-    );
-    final mealValues = _buildDailyValues(
-      _nLogs,
-      'logged_at',
-      (_) => 1,
-    );
+    final workoutValues = _buildDailyValues(_wLogs, 'completed_at', (_) => 1);
+    final mealValues = _buildDailyValues(_nLogs, 'logged_at', (_) => 1);
     final calorieValues = _buildDailyValues(
       _nLogs,
       'logged_at',
@@ -167,7 +173,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ApexScreenHeader(
             eyebrow: 'Stats',
             title: 'Reports',
-            subtitle: 'Achievements, graphs, and daily signals that feel more like a game board.',
+            subtitle:
+                'Achievements, graphs, and daily signals that feel more like a game board.',
           ),
           const SizedBox(height: 14),
           Row(
@@ -177,8 +184,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   onTap: () => setState(() => _show1RM = false),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(color: !_show1RM ? ApexColors.accent : ApexColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: ApexColors.border)),
-                    child: Center(child: Text('Dashboard', style: TextStyle(color: !_show1RM ? ApexColors.bg : ApexColors.t2, fontWeight: FontWeight.w700))),
+                    decoration: BoxDecoration(
+                      color: !_show1RM ? ApexColors.accent : ApexColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: ApexColors.border),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Dashboard',
+                        style: TextStyle(
+                          color: !_show1RM ? ApexColors.bg : ApexColors.t2,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -188,8 +207,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   onTap: () => setState(() => _show1RM = true),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(color: _show1RM ? ApexColors.purple : ApexColors.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: ApexColors.border)),
-                    child: Center(child: Text('1RM Extrapolation', style: TextStyle(color: _show1RM ? ApexColors.bg : ApexColors.t2, fontWeight: FontWeight.w700))),
+                    decoration: BoxDecoration(
+                      color: _show1RM ? ApexColors.purple : ApexColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: ApexColors.border),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '1RM Extrapolation',
+                        style: TextStyle(
+                          color: _show1RM ? ApexColors.bg : ApexColors.t2,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -213,7 +244,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 borderRadius: BorderRadius.circular(22),
                 border: Border.all(color: ApexColors.borderStrong),
                 boxShadow: [
-                  BoxShadow(color: ApexColors.shadow.withAlpha(22), blurRadius: 18, offset: const Offset(0, 10)),
+                  BoxShadow(
+                    color: ApexColors.shadow.withAlpha(22),
+                    blurRadius: 18,
+                    offset: const Offset(0, 10),
+                  ),
                 ],
               ),
               child: Row(
@@ -233,16 +268,38 @@ class _ReportsScreenState extends State<ReportsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Habit Dashboard', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18, color: ApexColors.t1)),
+                  Text(
+                    'Habit Dashboard',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                      color: ApexColors.t1,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text('Daily unified radial tracking goals.', style: TextStyle(fontSize: 12, color: ApexColors.t2)),
+                  Text(
+                    'Daily unified radial tracking goals.',
+                    style: TextStyle(fontSize: 12, color: ApexColors.t2),
+                  ),
                   const SizedBox(height: 24),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _buildRing('Water\n${(avgWater/1000).toStringAsFixed(1)}L', (avgWater / 3000).clamp(0.0, 1.0), ApexColors.cyan),
-                      _buildRing('Protein\n${_avgMacro('protein_g')}g', (_avgMacro('protein_g') / 160).clamp(0.0, 1.0), ApexColors.blue),
-                      _buildRing('Workouts\n${_wLogs.length}', (_wLogs.length / (_days / 2)).clamp(0.0, 1.0), ApexColors.accentSoft),
+                      _buildRing(
+                        'Water\n${(avgWater / 1000).toStringAsFixed(1)}L',
+                        (avgWater / 3000).clamp(0.0, 1.0),
+                        ApexColors.cyan,
+                      ),
+                      _buildRing(
+                        'Protein\n${_avgMacro('protein_g')}g',
+                        (_avgMacro('protein_g') / 160).clamp(0.0, 1.0),
+                        ApexColors.blue,
+                      ),
+                      _buildRing(
+                        'Workouts\n${_wLogs.length}',
+                        (_wLogs.length / (_days / 2)).clamp(0.0, 1.0),
+                        ApexColors.accentSoft,
+                      ),
                     ],
                   ),
                 ],
@@ -301,14 +358,34 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text('${_nLogs.length} meals', style: ApexTheme.mono(size: 16, color: ApexColors.orange)),
-                          Text('$avgCal avg kcal/day', style: GoogleFonts.inter(fontSize: 10, color: ApexColors.t3, fontWeight: FontWeight.w700)),
+                          Text(
+                            '${_nLogs.length} meals',
+                            style: ApexTheme.mono(
+                              size: 16,
+                              color: ApexColors.orange,
+                            ),
+                          ),
+                          Text(
+                            '$avgCal avg kcal/day',
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              color: ApexColors.t3,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ],
                       ),
                     ],
                   ),
                   const SizedBox(height: 14),
-                  Text('Meals', style: GoogleFonts.inter(fontSize: 11, color: ApexColors.t3, fontWeight: FontWeight.w700)),
+                  Text(
+                    'Meals',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: ApexColors.t3,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   ApexTrendChart(
                     values: mealValues,
@@ -318,7 +395,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     compact: true,
                   ),
                   const SizedBox(height: 12),
-                  Text('Calories line', style: GoogleFonts.inter(fontSize: 11, color: ApexColors.t3, fontWeight: FontWeight.w700)),
+                  Text(
+                    'Calories line',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: ApexColors.t3,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   ApexLineTrendChart(
                     values: calorieValues,
@@ -346,7 +430,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ApexCard(
                 child: Text(
                   _waterError!,
-                  style: const TextStyle(color: ApexColors.red, fontSize: 11, height: 1.5),
+                  style: const TextStyle(
+                    color: ApexColors.red,
+                    fontSize: 11,
+                    height: 1.5,
+                  ),
                 ),
               ),
             ],
@@ -390,18 +478,23 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           SizedBox(
                             width: 68,
                             child: TextField(
+                              key: const ValueKey('body_weight_input'),
                               controller: _bwC,
                               keyboardType: TextInputType.number,
                               textAlign: TextAlign.center,
                               style: ApexTheme.mono(size: 11),
                               decoration: const InputDecoration(
                                 hintText: 'kg',
-                                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 8,
+                                ),
                               ),
                             ),
                           ),
                           const SizedBox(width: 7),
                           ApexButton(
+                            key: const ValueKey('body_weight_log_button'),
                             text: 'Log',
                             onPressed: _logBw,
                             sm: true,
@@ -418,7 +511,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     Center(
                       child: Text(
                         'Log 2+ weigh-ins to see the graph',
-                        style: GoogleFonts.inter(fontSize: 12, color: ApexColors.t3),
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: ApexColors.t3,
+                        ),
                       ),
                     )
                   else ...[
@@ -431,14 +527,23 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _bwStat('Start', '${_bwLogs.last['weight_kg']}kg', ApexColors.t2),
+                        _bwStat(
+                          'Start',
+                          '${_bwLogs.last['weight_kg']}kg',
+                          ApexColors.t2,
+                        ),
                         const SizedBox(width: 14),
-                        _bwStat('Latest', '${_bwLogs.first['weight_kg']}kg', ApexColors.purple),
+                        _bwStat(
+                          'Latest',
+                          '${_bwLogs.first['weight_kg']}kg',
+                          ApexColors.purple,
+                        ),
                         const SizedBox(width: 14),
                         _bwStat(
                           'Δ',
                           '${((_bwLogs.first['weight_kg'] as num) - (_bwLogs.last['weight_kg'] as num)).toStringAsFixed(1)}kg',
-                          (_bwLogs.first['weight_kg'] as num) < (_bwLogs.last['weight_kg'] as num)
+                          (_bwLogs.first['weight_kg'] as num) <
+                                  (_bwLogs.last['weight_kg'] as num)
                               ? ApexColors.accentSoft
                               : ApexColors.orange,
                         ),
@@ -463,9 +568,24 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    MacroBar(label: 'Protein', value: _avgMacro('protein_g'), goal: 160, color: ApexColors.blue),
-                    MacroBar(label: 'Carbs', value: _avgMacro('carbs_g'), goal: 250, color: ApexColors.orange),
-                    MacroBar(label: 'Fat', value: _avgMacro('fat_g'), goal: 70, color: ApexColors.purple),
+                    MacroBar(
+                      label: 'Protein',
+                      value: _avgMacro('protein_g'),
+                      goal: 160,
+                      color: ApexColors.blue,
+                    ),
+                    MacroBar(
+                      label: 'Carbs',
+                      value: _avgMacro('carbs_g'),
+                      goal: 250,
+                      color: ApexColors.orange,
+                    ),
+                    MacroBar(
+                      label: 'Fat',
+                      value: _avgMacro('fat_g'),
+                      goal: 70,
+                      color: ApexColors.purple,
+                    ),
                   ],
                 ),
               ),
@@ -526,7 +646,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
               child: Text(
                 'Try hitting 4 workouts, 5 meal-tracking days, 2.2L average hydration, or multiple weigh-ins to unlock your first trophy.',
-                style: GoogleFonts.inter(fontSize: 12, color: ApexColors.t2, height: 1.55),
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: ApexColors.t2,
+                  height: 1.55,
+                ),
               ),
             )
           else
@@ -535,7 +659,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
               child: Row(
                 children: achievements.map((achievement) {
                   return Padding(
-                    padding: EdgeInsets.only(right: achievement == achievements.last ? 0 : 10),
+                    padding: EdgeInsets.only(
+                      right: achievement == achievements.last ? 0 : 10,
+                    ),
                     child: Container(
                       width: 188,
                       padding: const EdgeInsets.all(16),
@@ -549,7 +675,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
                           ],
                         ),
                         borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: achievement.color.withAlpha(76)),
+                        border: Border.all(
+                          color: achievement.color.withAlpha(76),
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: achievement.color.withAlpha(18),
@@ -568,7 +696,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
                               color: achievement.color.withAlpha(18),
                               borderRadius: BorderRadius.circular(14),
                             ),
-                            child: Icon(achievement.icon, color: achievement.color, size: 20),
+                            child: Icon(
+                              achievement.icon,
+                              color: achievement.color,
+                              size: 20,
+                            ),
                           ),
                           const SizedBox(height: 12),
                           Text(
@@ -631,7 +763,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     const SizedBox(height: 4),
                     Text(
                       subtitle,
-                      style: GoogleFonts.inter(fontSize: 12, color: ApexColors.t2),
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: ApexColors.t2,
+                      ),
                     ),
                   ],
                 ),
@@ -654,7 +789,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
     final map = <String, double>{};
     for (int i = _days - 1; i >= 0; i--) {
       final d = DateTime.now().subtract(Duration(days: i));
-      map['${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}'] = 0;
+      map['${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}'] =
+          0;
     }
     for (final l in logs) {
       final d = (l[dateField] as String?)?.split('T')[0];
@@ -745,11 +881,28 @@ class _ReportsScreenState extends State<ReportsScreen> {
         .toSet()
         .length
         .clamp(1, 999);
-    return _nLogs.fold<double>(0, (a, l) => a + ((l[field] as num?)?.toDouble() ?? 0)) / days;
+    return _nLogs.fold<double>(
+          0,
+          (a, l) => a + ((l[field] as num?)?.toDouble() ?? 0),
+        ) /
+        days;
   }
 
   String _monthShort(int month) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     return months[month - 1];
   }
 
@@ -786,7 +939,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget _bwStat(String label, String value, Color color) {
     return Column(
       children: [
-        Text(label.toUpperCase(), style: const TextStyle(fontSize: 9, color: ApexColors.t3)),
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(fontSize: 9, color: ApexColors.t3),
+        ),
         const SizedBox(height: 1),
         Text(value, style: ApexTheme.mono(size: 14, color: color)),
       ],
@@ -796,7 +952,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget _build1RMDashboard() {
     final Map<String, double> top1RM = {};
     final Map<String, List<double>> history1RM = {};
-    
+
     // Parse sequentially chronologically (reversed from wLogs which is newest first)
     for (final w in _wLogs.reversed) {
       final exs = (w['exercises'] as List?)?.cast<Map<String, dynamic>>() ?? [];
@@ -829,18 +985,34 @@ class _ReportsScreenState extends State<ReportsScreen> {
           padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 32),
           child: Column(
             children: [
-              const Icon(Icons.calculate, size: 64, color: ApexColors.accentSoft),
+              const Icon(
+                Icons.calculate,
+                size: 64,
+                color: ApexColors.accentSoft,
+              ),
               const SizedBox(height: 16),
-              Text('No 1RM Data', style: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w800, color: ApexColors.t1)),
+              Text(
+                'No 1RM Data',
+                style: GoogleFonts.inter(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: ApexColors.t1,
+                ),
+              ),
               const SizedBox(height: 8),
-              Text('Log at least one completed set with weight and reps to generate extrapolation tables.', textAlign: TextAlign.center, style: TextStyle(color: ApexColors.t2, height: 1.5)),
+              Text(
+                'Log at least one completed set with weight and reps to generate extrapolation tables.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: ApexColors.t2, height: 1.5),
+              ),
             ],
           ),
         ),
       );
     }
 
-    final entries = top1RM.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final entries = top1RM.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
 
     return Column(
       children: entries.map((e) {
@@ -855,39 +1027,94 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Expanded(child: Text(name, style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18, color: ApexColors.t1))),
-                    Text('${rm.round()} kg', style: GoogleFonts.inter(fontWeight: FontWeight.w900, fontSize: 18, color: ApexColors.accent)),
+                    Expanded(
+                      child: Text(
+                        name,
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 18,
+                          color: ApexColors.t1,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${rm.round()} kg',
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 18,
+                        color: ApexColors.accent,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('Estimated 1 Rep Max', style: TextStyle(fontSize: 12, color: ApexColors.t3)),
+                Text(
+                  'Estimated 1 Rep Max',
+                  style: TextStyle(fontSize: 12, color: ApexColors.t3),
+                ),
                 const SizedBox(height: 16),
                 Wrap(
-                  spacing: 8, runSpacing: 8,
-                  children: [100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50].map((pct) {
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [100, 95, 90, 85, 80, 75, 70, 65, 60, 55, 50].map((
+                    pct,
+                  ) {
                     final w = SmartCoach.prescribedWeight(rm, pct / 100);
                     final isTop = pct >= 90;
                     return Container(
                       width: 72,
                       padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(color: ApexColors.bg, borderRadius: BorderRadius.circular(8), border: Border.all(color: isTop ? ApexColors.red.withAlpha(50) : ApexColors.border)),
+                      decoration: BoxDecoration(
+                        color: ApexColors.bg,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isTop
+                              ? ApexColors.red.withAlpha(50)
+                              : ApexColors.border,
+                        ),
+                      ),
                       child: Column(
                         children: [
-                          Text('$pct%', style: GoogleFonts.inter(fontSize: 11, color: isTop ? ApexColors.red : ApexColors.t3, fontWeight: FontWeight.w700)),
+                          Text(
+                            '$pct%',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: isTop ? ApexColors.red : ApexColors.t3,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                           const SizedBox(height: 4),
-                          Text('${w.round()}', style: GoogleFonts.inter(fontSize: 16, color: ApexColors.t1, fontWeight: FontWeight.w800)),
+                          Text(
+                            '${w.round()}',
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              color: ApexColors.t1,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                         ],
                       ),
                     );
                   }).toList(),
                 ),
-                if (history1RM.containsKey(name) && history1RM[name]!.length > 1) ...[
+                if (history1RM.containsKey(name) &&
+                    history1RM[name]!.length > 1) ...[
                   const SizedBox(height: 24),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('1RM Progression trajectory', style: TextStyle(fontSize: 12, color: ApexColors.t2, fontWeight: FontWeight.w700)),
-                      Text('${history1RM[name]!.length} sessions', style: TextStyle(fontSize: 10, color: ApexColors.t3)),
+                      Text(
+                        '1RM Progression trajectory',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: ApexColors.t2,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        '${history1RM[name]!.length} sessions',
+                        style: TextStyle(fontSize: 10, color: ApexColors.t3),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -909,36 +1136,79 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return Column(
       children: [
         SizedBox(
-          width: 72, height: 72,
+          width: 72,
+          height: 72,
           child: Stack(
             fit: StackFit.expand,
             children: [
-              CircularProgressIndicator(value: 1.0, strokeWidth: 8, color: color.withAlpha(25)),
-              CircularProgressIndicator(value: progress, strokeWidth: 8, color: color, strokeCap: StrokeCap.round),
+              CircularProgressIndicator(
+                value: 1.0,
+                strokeWidth: 8,
+                color: color.withAlpha(25),
+              ),
+              CircularProgressIndicator(
+                value: progress,
+                strokeWidth: 8,
+                color: color,
+                strokeCap: StrokeCap.round,
+              ),
               Center(
                 child: Text(
                   '${(progress * 100).round()}%',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 13, color: ApexColors.t1),
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                    color: ApexColors.t1,
+                  ),
                 ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 12),
-        Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: ApexColors.t2, height: 1.4, fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 11,
+            color: ApexColors.t2,
+            height: 1.4,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildHeatmapCard() {
-    final Map<String, double> intensities = {'Head': 0, 'Shoulders': 0, 'Chest': 0, 'Core': 0, 'Arms': 0, 'Legs': 0};
+    final Map<String, double> intensities = {
+      'Head': 0,
+      'Shoulders': 0,
+      'Chest': 0,
+      'Core': 0,
+      'Arms': 0,
+      'Legs': 0,
+    };
     for (var w in _wLogs) {
       final n = w['name'].toString().toLowerCase();
-      if (n.contains('push') || n.contains('chest')) intensities['Chest'] = (intensities['Chest']! + 0.2).clamp(0.0, 1.0);
-      if (n.contains('pull') || n.contains('back')) intensities['Arms'] = (intensities['Arms']! + 0.2).clamp(0.0, 1.0);
-      if (n.contains('leg') || n.contains('squat')) intensities['Legs'] = (intensities['Legs']! + 0.3).clamp(0.0, 1.0);
-      if (n.contains('core') || n.contains('abs') || n.contains('hiit')) intensities['Core'] = (intensities['Core']! + 0.25).clamp(0.0, 1.0);
-      if (n.contains('shoulder')) intensities['Shoulders'] = (intensities['Shoulders']! + 0.3).clamp(0.0, 1.0);
+      if (n.contains('push') || n.contains('chest')) {
+        intensities['Chest'] = (intensities['Chest']! + 0.2).clamp(0.0, 1.0);
+      }
+      if (n.contains('pull') || n.contains('back')) {
+        intensities['Arms'] = (intensities['Arms']! + 0.2).clamp(0.0, 1.0);
+      }
+      if (n.contains('leg') || n.contains('squat')) {
+        intensities['Legs'] = (intensities['Legs']! + 0.3).clamp(0.0, 1.0);
+      }
+      if (n.contains('core') || n.contains('abs') || n.contains('hiit')) {
+        intensities['Core'] = (intensities['Core']! + 0.25).clamp(0.0, 1.0);
+      }
+      if (n.contains('shoulder')) {
+        intensities['Shoulders'] = (intensities['Shoulders']! + 0.3).clamp(
+          0.0,
+          1.0,
+        );
+      }
     }
 
     return ApexCard(
@@ -953,9 +1223,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Volume Heatmap', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18, color: ApexColors.t1)),
+                  Text(
+                    'Volume Heatmap',
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                      color: ApexColors.t1,
+                    ),
+                  ),
                   const SizedBox(height: 4),
-                  Text('3D anatomical distribution', style: TextStyle(fontSize: 12, color: ApexColors.t2)),
+                  Text(
+                    '3D anatomical distribution',
+                    style: TextStyle(fontSize: 12, color: ApexColors.t2),
+                  ),
                 ],
               ),
               const Icon(Icons.accessibility_new_rounded, color: ApexColors.t3),
@@ -980,7 +1260,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget _buildContributionGraph() {
     final now = DateTime.now();
     final days = List.generate(84, (i) => now.subtract(Duration(days: 83 - i)));
-    
+
     final Set<String> activeDates = _wLogs.map((w) {
       final iso = w['completed_at']?.toString();
       if (iso == null) return '';
@@ -996,12 +1276,29 @@ class _ReportsScreenState extends State<ReportsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Contribution Heatmap', style: GoogleFonts.inter(fontWeight: FontWeight.w800, fontSize: 18, color: ApexColors.t1)),
-              Text('${activeDates.length} days active', style: GoogleFonts.inter(fontSize: 12, color: ApexColors.accent, fontWeight: FontWeight.w700)),
+              Text(
+                'Contribution Heatmap',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                  color: ApexColors.t1,
+                ),
+              ),
+              Text(
+                '${activeDates.length} days active',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: ApexColors.accent,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 4),
-          Text('Consistency over the last 12 weeks', style: TextStyle(fontSize: 12, color: ApexColors.t2)),
+          Text(
+            'Consistency over the last 12 weeks',
+            style: TextStyle(fontSize: 12, color: ApexColors.t2),
+          ),
           const SizedBox(height: 16),
           SizedBox(
             height: 110,
@@ -1010,20 +1307,23 @@ class _ReportsScreenState extends State<ReportsScreen> {
               padding: EdgeInsets.zero,
               scrollDirection: Axis.horizontal,
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 7, 
-                mainAxisSpacing: 6, 
+                crossAxisCount: 7,
+                mainAxisSpacing: 6,
                 crossAxisSpacing: 6,
               ),
               itemCount: days.length,
               itemBuilder: (ctx, i) {
                 final d = days[i];
-                final ds = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+                final ds =
+                    '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
                 final active = activeDates.contains(ds);
                 return Container(
                   decoration: BoxDecoration(
                     color: active ? ApexColors.accent : ApexColors.surface,
                     borderRadius: BorderRadius.circular(3),
-                    border: active ? null : Border.all(color: ApexColors.border),
+                    border: active
+                        ? null
+                        : Border.all(color: ApexColors.border),
                   ),
                 );
               },
@@ -1101,13 +1401,19 @@ class _AchievementBeaconState extends State<_AchievementBeacon>
               ),
               boxShadow: [
                 BoxShadow(
-                  color: ApexColors.yellow.withAlpha(36 + (_controller.value * 32).round()),
+                  color: ApexColors.yellow.withAlpha(
+                    36 + (_controller.value * 32).round(),
+                  ),
                   blurRadius: 20,
                   spreadRadius: 2,
                 ),
               ],
             ),
-            child: const Icon(Icons.workspace_premium_rounded, color: ApexColors.ink, size: 30),
+            child: const Icon(
+              Icons.workspace_premium_rounded,
+              color: ApexColors.ink,
+              size: 30,
+            ),
           ),
         );
       },

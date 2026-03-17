@@ -39,10 +39,10 @@ class _NutritionScreenState extends State<NutritionScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final l = await SupabaseService.getNutritionLogs(
-        SupabaseService.currentUser!.id,
-        limit: 50,
+      final userId = SupabaseService.requireUserId(
+        action: 'load your nutrition log',
       );
+      final l = await SupabaseService.getNutritionLogs(userId, limit: 50);
       if (mounted) {
         setState(() {
           _logs = l;
@@ -67,8 +67,9 @@ class _NutritionScreenState extends State<NutritionScreen> {
     FocusScope.of(context).unfocus();
 
     try {
+      final userId = SupabaseService.requireUserId(action: 'save a meal');
       await SupabaseService.createNutritionLog({
-        'user_id': SupabaseService.currentUser!.id,
+        'user_id': userId,
         'meal_name': _foodC.text.trim(),
         'quantity': _qtyC.text.trim().isNotEmpty ? _qtyC.text.trim() : null,
         'calories': int.tryParse(_calC.text) ?? 0,
@@ -170,12 +171,18 @@ class _NutritionScreenState extends State<NutritionScreen> {
                             'Food Name',
                             _foodC,
                             'e.g. Boiled eggs',
+                            fieldKey: 'meal_food_field',
                           ),
                         ),
                         const SizedBox(width: 8),
                         SizedBox(
                           width: 90,
-                          child: _field('Quantity', _qtyC, '4 pcs'),
+                          child: _field(
+                            'Quantity',
+                            _qtyC,
+                            '4 pcs',
+                            fieldKey: 'meal_quantity_field',
+                          ),
                         ),
                       ],
                     ),
@@ -329,7 +336,13 @@ class _NutritionScreenState extends State<NutritionScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: _field('Calories', _calC, '0', number: true),
+                          child: _field(
+                            'Calories',
+                            _calC,
+                            '0',
+                            number: true,
+                            fieldKey: 'meal_calories_field',
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -338,6 +351,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
                             _protC,
                             '0',
                             number: true,
+                            fieldKey: 'meal_protein_field',
                           ),
                         ),
                       ],
@@ -351,11 +365,18 @@ class _NutritionScreenState extends State<NutritionScreen> {
                             _carbsC,
                             '0',
                             number: true,
+                            fieldKey: 'meal_carbs_field',
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: _field('Fat (g)', _fatC, '0', number: true),
+                          child: _field(
+                            'Fat (g)',
+                            _fatC,
+                            '0',
+                            number: true,
+                            fieldKey: 'meal_fat_field',
+                          ),
                         ),
                       ],
                     ),
@@ -379,6 +400,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
                             const SizedBox(width: 10),
                             Expanded(
                               child: ApexButton(
+                                key: const ValueKey('save_meal_button'),
                                 text: 'Save Meal',
                                 onPressed: () {
                                   _saveMeal().then((_) {
@@ -637,6 +659,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 20, right: 8),
         child: FloatingActionButton(
+          key: const ValueKey('log_meal_fab'),
           onPressed: _showAddModal,
           backgroundColor: ApexColors.t1,
           foregroundColor: ApexColors.bg,
@@ -655,6 +678,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
     TextEditingController c,
     String hint, {
     bool number = false,
+    String? fieldKey,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -670,6 +694,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
         ),
         const SizedBox(height: 6),
         TextField(
+          key: fieldKey == null ? null : ValueKey(fieldKey),
           controller: c,
           keyboardType: number ? TextInputType.number : TextInputType.text,
           style: GoogleFonts.inter(fontSize: 13, color: ApexColors.t1),

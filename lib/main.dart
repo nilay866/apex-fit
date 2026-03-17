@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants/app_config.dart';
 import 'constants/theme.dart';
 import 'constants/colors.dart';
+import 'repositories/auth_repository.dart';
+import 'repositories/workout_repository.dart';
 import 'services/supabase_service.dart';
 import 'services/ai_service.dart';
 import 'services/exercise_animation_service.dart';
@@ -39,6 +42,8 @@ enum AppState { loading, auth, home }
 
 class _ApexAIAppState extends State<ApexAIApp> {
   AppState _state = AppState.loading;
+  StreamSubscription<User?>? _authSubscription;
+  bool _listeningToAuth = false;
 
   @override
   void initState() {
@@ -59,16 +64,35 @@ class _ApexAIAppState extends State<ApexAIApp> {
         _initExerciseAnimations(),
       ]);
 
-      if (SupabaseService.currentUser != null) {
-        setState(() => _state = AppState.home);
-        // Decentralized fire-and-forget sync
-        unawaited(SupabaseService.syncOfflineWorkouts());
-      } else {
-        setState(() => _state = AppState.auth);
+      _bindAuthState();
+
+      final hasSession = authRepository.currentUser != null;
+      if (mounted) {
+        setState(() => _state = hasSession ? AppState.home : AppState.auth);
+      }
+      if (hasSession) {
+        unawaited(workoutRepository.syncOfflineQueue());
       }
     } catch (e) {
       if (mounted) setState(() => _state = AppState.auth);
     }
+  }
+
+  void _bindAuthState() {
+    if (_listeningToAuth) return;
+    _listeningToAuth = true;
+    _authSubscription = authRepository.sessionChanges().listen((user) {
+      if (!mounted) return;
+
+      final nextState = user == null ? AppState.auth : AppState.home;
+      if (_state != nextState) {
+        setState(() => _state = nextState);
+      }
+
+      if (user != null) {
+        unawaited(workoutRepository.syncOfflineQueue());
+      }
+    });
   }
 
   Future<void> _initAI() async {
@@ -98,9 +122,15 @@ class _ApexAIAppState extends State<ApexAIApp> {
 
   Future<void> _onSignOut() async {
     try {
-      await SupabaseService.signOut();
+      await authRepository.signOut();
     } catch (_) {}
     setState(() => _state = AppState.auth);
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 
   @override

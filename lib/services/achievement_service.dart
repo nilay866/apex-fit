@@ -1,6 +1,3 @@
-import 'dart:convert';
-import '../services/supabase_service.dart';
-
 class Achievement {
   final String id;
   final String title;
@@ -72,7 +69,9 @@ class AchievementService {
 
     // 1. First Workout
     if (logs.isNotEmpty) {
-      unlocked.add(availableAchievements.firstWhere((a) => a.id == 'first_workout'));
+      unlocked.add(
+        availableAchievements.firstWhere((a) => a.id == 'first_workout'),
+      );
     }
 
     // 2. 7-Day Streak
@@ -86,7 +85,9 @@ class AchievementService {
       totalVol += (log['total_volume'] as num?)?.toDouble() ?? 0;
     }
     if (totalVol >= 10000) {
-      unlocked.add(availableAchievements.firstWhere((a) => a.id == 'volume_10k'));
+      unlocked.add(
+        availableAchievements.firstWhere((a) => a.id == 'volume_10k'),
+      );
     }
 
     // 4. 50km Distance
@@ -95,13 +96,17 @@ class AchievementService {
     // For this mock, let's look for cardio entries.
     double totalDist = 0;
     for (final log in logs) {
-      if (log['workout_name']?.toString().toLowerCase().contains('run') ?? false) {
+      if (log['workout_name']?.toString().toLowerCase().contains('run') ??
+          false) {
         // Mock distance extraction if not in schema
-        totalDist += (log['duration_min'] as num? ?? 0) * 0.15; // Rough estimate: 9km/h
+        totalDist +=
+            (log['duration_min'] as num? ?? 0) * 0.15; // Rough estimate: 9km/h
       }
     }
     if (totalDist >= 50) {
-      unlocked.add(availableAchievements.firstWhere((a) => a.id == 'distance_50km'));
+      unlocked.add(
+        availableAchievements.firstWhere((a) => a.id == 'distance_50km'),
+      );
     }
 
     // 5. 20 Workouts in a month
@@ -111,21 +116,11 @@ class AchievementService {
       return date != null && date.year == now.year && date.month == now.month;
     }).length;
     if (monthLogs >= 20) {
-      unlocked.add(availableAchievements.firstWhere((a) => a.id == 'month_warrior'));
+      unlocked.add(
+        availableAchievements.firstWhere((a) => a.id == 'month_warrior'),
+      );
     }
 
     return unlocked;
-  }
-
-  // Map icon name string to IconData
-  static dynamic getIconData(String iconName) {
-    switch (iconName) {
-      case 'stars_rounded': return 0xe5fe;
-      case 'local_fire_department_rounded': return 0xe395;
-      case 'fitness_center_rounded': return 0xe28a;
-      case 'directions_run_rounded': return 0xe1f1;
-      case 'workspace_premium_rounded': return 0xef2c;
-      default: return 0xe5fe;
-    }
   }
 }

@@ -7,6 +7,7 @@ import '../widgets/apex_button.dart';
 import '../widgets/apex_card.dart';
 import '../widgets/apex_screen_header.dart';
 import '../widgets/apex_tag.dart';
+import '../repositories/auth_repository.dart';
 import '../services/supabase_service.dart';
 import 'exercise_library_screen.dart';
 import '../routine_system/routine_library_screen.dart';
@@ -23,7 +24,14 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
   List<Map<String, dynamic>> _workouts = [];
   bool _loading = true;
   String _folder = 'All';
-  final List<String> _folders = ['All', 'Hypertrophy', 'Strength', 'Cardio', 'HIIT', 'Mobility'];
+  final List<String> _folders = [
+    'All',
+    'Hypertrophy',
+    'Strength',
+    'Cardio',
+    'HIIT',
+    'Mobility',
+  ];
 
   static const _typeColors = {
     'Gym': ApexColors.blue,
@@ -42,7 +50,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
     setState(() => _loading = true);
     try {
       final w = await SupabaseService.getWorkouts(
-        SupabaseService.currentUser!.id,
+        authRepository.requireUserId(),
       );
       if (mounted) {
         setState(() {
@@ -95,17 +103,39 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                   GestureDetector(
                     onTap: () {
                       HapticFeedback.selectionClick();
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const RoutineLibraryScreen()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const RoutineLibraryScreen(),
+                        ),
+                      );
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(color: ApexColors.cardAlt, borderRadius: BorderRadius.circular(16)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: ApexColors.cardAlt,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.list_alt_rounded, color: ApexColors.purple, size: 16),
+                          const Icon(
+                            Icons.list_alt_rounded,
+                            color: ApexColors.purple,
+                            size: 16,
+                          ),
                           const SizedBox(width: 6),
-                          Text('Routines', style: GoogleFonts.inter(color: ApexColors.t1, fontSize: 12, fontWeight: FontWeight.w700)),
+                          Text(
+                            'Routines',
+                            style: GoogleFonts.inter(
+                              color: ApexColors.t1,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -114,17 +144,39 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                   GestureDetector(
                     onTap: () {
                       HapticFeedback.selectionClick();
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ExerciseLibraryScreen()));
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ExerciseLibraryScreen(),
+                        ),
+                      );
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(color: ApexColors.cardAlt, borderRadius: BorderRadius.circular(16)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: ApexColors.cardAlt,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.menu_book_rounded, color: ApexColors.accent, size: 16),
+                          const Icon(
+                            Icons.menu_book_rounded,
+                            color: ApexColors.accent,
+                            size: 16,
+                          ),
                           const SizedBox(width: 6),
-                          Text('Library', style: GoogleFonts.inter(color: ApexColors.t1, fontSize: 12, fontWeight: FontWeight.w700)),
+                          Text(
+                            'Library',
+                            style: GoogleFonts.inter(
+                              color: ApexColors.t1,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -190,13 +242,30 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                         duration: const Duration(milliseconds: 150),
                         margin: const EdgeInsets.only(right: 8),
                         padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(color: sel ? ApexColors.accent : ApexColors.surface, borderRadius: BorderRadius.circular(20), border: Border.all(color: sel ? ApexColors.accent : ApexColors.border)),
+                        decoration: BoxDecoration(
+                          color: sel ? ApexColors.accent : ApexColors.surface,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: sel ? ApexColors.accent : ApexColors.border,
+                          ),
+                        ),
                         child: Center(
                           child: Row(
                             children: [
-                              Icon(sel ? Icons.folder_open : Icons.folder, size: 14, color: sel ? ApexColors.bg : ApexColors.t3),
+                              Icon(
+                                sel ? Icons.folder_open : Icons.folder,
+                                size: 14,
+                                color: sel ? ApexColors.bg : ApexColors.t3,
+                              ),
                               const SizedBox(width: 6),
-                              Text(f, style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 12, color: sel ? ApexColors.bg : ApexColors.t2)),
+                              Text(
+                                f,
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                  color: sel ? ApexColors.bg : ApexColors.t2,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -206,124 +275,133 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              ..._workouts.where((w) {
-                if (_folder == 'All') return true;
-                final t = w['type']?.toString().toLowerCase() ?? '';
-                if (_folder == 'Hypertrophy' || _folder == 'Strength') return t == 'gym' || t == 'calisthenics';
-                if (_folder == 'Cardio') return t == 'cardio' || t == 'run';
-                if (_folder == 'HIIT') return t == 'hiit' || t == 'circuit';
-                if (_folder == 'Mobility') return t == 'mobility';
-                return true;
-              }).map((w) {
-                final exercises =
-                    (w['exercises'] as List?)?.cast<Map<String, dynamic>>() ??
-                    [];
-                final color = _typeColors[w['type']] ?? ApexColors.blue;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: ApexCard(
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      _showDetail(w);
-                    },
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              ..._workouts
+                  .where((w) {
+                    if (_folder == 'All') return true;
+                    final t = w['type']?.toString().toLowerCase() ?? '';
+                    if (_folder == 'Hypertrophy' || _folder == 'Strength') {
+                      return t == 'gym' || t == 'calisthenics';
+                    }
+                    if (_folder == 'Cardio') return t == 'cardio' || t == 'run';
+                    if (_folder == 'HIIT') return t == 'hiit' || t == 'circuit';
+                    if (_folder == 'Mobility') return t == 'mobility';
+                    return true;
+                  })
+                  .map((w) {
+                    final exercises =
+                        (w['exercises'] as List?)
+                            ?.cast<Map<String, dynamic>>() ??
+                        [];
+                    final color = _typeColors[w['type']] ?? ApexColors.blue;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: ApexCard(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          _showDetail(w);
+                        },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    w['name'] ?? '',
-                                    style: GoogleFonts.inter(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 15,
-                                      color: ApexColors.t1,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${exercises.length} exercises',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      color: ApexColors.t2,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                             Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                _iconBtn(
-                                  Icons.visibility_outlined,
-                                  ApexColors.purple,
-                                  () {
-                                    HapticFeedback.selectionClick();
-                                    _showDetail(w);
-                                  },
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        w['name'] ?? '',
+                                        style: GoogleFonts.inter(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 15,
+                                          color: ApexColors.t1,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${exercises.length} exercises',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          color: ApexColors.t2,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                const SizedBox(width: 6),
-                                _iconBtn(
-                                  Icons.play_arrow_rounded,
-                                  ApexColors.accent,
-                                  () {
-                                    HapticFeedback.heavyImpact();
-                                    widget.onStartWorkout(w);
-                                  },
-                                  fill: true,
+                                Row(
+                                  children: [
+                                    _iconBtn(
+                                      Icons.visibility_outlined,
+                                      ApexColors.purple,
+                                      () {
+                                        HapticFeedback.selectionClick();
+                                        _showDetail(w);
+                                      },
+                                    ),
+                                    const SizedBox(width: 6),
+                                    _iconBtn(
+                                      Icons.play_arrow_rounded,
+                                      ApexColors.accent,
+                                      () {
+                                        HapticFeedback.heavyImpact();
+                                        widget.onStartWorkout(w);
+                                      },
+                                      fill: true,
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
+                            if (exercises.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: exercises
+                                    .take(4)
+                                    .map(
+                                      (e) => Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: color.withAlpha(14),
+                                          border: Border.all(
+                                            color: color.withAlpha(44),
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          '${e['name']} · ${e['sets']} sets',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 10,
+                                            color: ApexColors.t2,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                            ],
                           ],
                         ),
-                        if (exercises.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: exercises
-                                .take(4)
-                                .map(
-                                  (e) => Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: color.withAlpha(14),
-                                      border: Border.all(
-                                        color: color.withAlpha(44),
-                                      ),
-                                      borderRadius: BorderRadius.circular(999),
-                                    ),
-                                    child: Text(
-                                      '${e['name']} · ${e['sets']} sets',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 10,
-                                        color: ApexColors.t2,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                );
-              }),
+                      ),
+                    );
+                  }),
+            ],
           ],
-        ],
+        ),
       ),
-    ),
-    floatingActionButton: Padding(
+      floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 20, right: 8),
         child: FloatingActionButton(
+          key: const ValueKey('new_workout_fab'),
           onPressed: _showCreateModal,
           backgroundColor: ApexColors.t1,
           foregroundColor: ApexColors.bg,
@@ -405,6 +483,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                 ),
               const SizedBox(height: 16),
               ...exercises.asMap().entries.map((entry) {
+                final repsLabel =
+                    entry.value['reps']?.toString().trim().isNotEmpty == true
+                    ? entry.value['reps'].toString()
+                    : '8-12';
+                final targetWeight = entry.value['target_weight'];
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.symmetric(
@@ -433,7 +516,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${entry.value['sets']} sets · ${entry.value['reps']} reps${entry.value['target_weight'] != null ? ' · ${entry.value['target_weight']}kg' : ''}',
+                              '${entry.value['sets']} sets · $repsLabel reps${targetWeight != null ? ' · ${targetWeight}kg' : ''}',
                               style: GoogleFonts.inter(
                                 fontSize: 11,
                                 color: ApexColors.t2,
@@ -524,6 +607,19 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
       setState(() => _err = 'Add at least 1 exercise.');
       return;
     }
+    final invalidWeightIndex = valid.indexWhere(
+      (exercise) =>
+          exercise.weight.text.trim().isNotEmpty &&
+          double.tryParse(exercise.weight.text.trim()) == null,
+    );
+    if (invalidWeightIndex != -1) {
+      HapticFeedback.vibrate();
+      setState(
+        () => _err =
+            'Enter a valid weight for exercise ${invalidWeightIndex + 1}.',
+      );
+      return;
+    }
 
     HapticFeedback.mediumImpact();
     setState(() {
@@ -536,11 +632,11 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
 
     try {
       final workout = await SupabaseService.createWorkout(
-        SupabaseService.currentUser!.id,
+        authRepository.requireUserId(),
         _nameC.text.trim(),
         'Gym',
       );
-      await SupabaseService.createExercises(
+      final usedLegacyExerciseFallback = await SupabaseService.createExercises(
         valid
             .map(
               (exercise) => {
@@ -560,10 +656,20 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
 
       HapticFeedback.heavyImpact();
       widget.onSaved();
+      if (mounted && usedLegacyExerciseFallback) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Workout saved. Your Supabase schema is older, so custom reps and target weights were skipped for now.',
+            ),
+            backgroundColor: ApexColors.orange,
+          ),
+        );
+      }
       if (mounted) Navigator.pop(context);
     } catch (e) {
       HapticFeedback.vibrate();
-      setState(() => _err = 'Error: $e');
+      setState(() => _err = SupabaseService.describeError(e));
     }
     if (mounted) {
       setState(() => _loading = false);
@@ -616,6 +722,7 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
               ),
               const SizedBox(height: 6),
               TextField(
+                key: const ValueKey('workout_name_field'),
                 controller: _nameC,
                 style: GoogleFonts.inter(fontSize: 13, color: ApexColors.t1),
                 decoration: InputDecoration(
@@ -646,6 +753,7 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
                     ),
                   ),
                   GestureDetector(
+                    key: const ValueKey('add_exercise_button'),
                     onTap: () {
                       HapticFeedback.selectionClick();
                       setState(() => _exercises.add(_ExerciseDraft()));
@@ -691,6 +799,7 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
                         children: [
                           Expanded(
                             child: TextField(
+                              key: ValueKey('exercise_name_field_$index'),
                               controller: exercise.name,
                               style: GoogleFonts.inter(
                                 fontSize: 13,
@@ -759,7 +868,7 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
                         children: [
                           _counterWidget(
                             label: 'Sets',
-                            value: '\${exercise.sets}',
+                            value: '${exercise.sets}',
                             onDec: () {
                               if (exercise.sets > 1) {
                                 HapticFeedback.selectionClick();
@@ -774,6 +883,7 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: TextField(
+                              key: ValueKey('exercise_reps_field_$index'),
                               controller: exercise.reps,
                               keyboardType: TextInputType.text,
                               style: GoogleFonts.inter(
@@ -802,6 +912,7 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: TextField(
+                              key: ValueKey('exercise_weight_field_$index'),
                               controller: exercise.weight,
                               keyboardType: TextInputType.number,
                               style: GoogleFonts.inter(
@@ -843,6 +954,7 @@ class _CreateWorkoutSheetState extends State<_CreateWorkoutSheet> {
                 ),
               const SizedBox(height: 8),
               ApexButton(
+                key: const ValueKey('save_workout_button'),
                 text: 'Save workout',
                 onPressed: _save,
                 full: true,

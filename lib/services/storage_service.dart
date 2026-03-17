@@ -5,6 +5,7 @@ import 'dart:async';
 class StorageService {
   static const _cfgKey = 'apexcfg_v4';
   static const _ssKey = 'apex_session_v4';
+  static const _offlineActionsKey = 'apex_offline_actions_v1';
 
   static Future<void> saveConfig({
     required String url,
@@ -83,6 +84,46 @@ class StorageService {
   static Future<void> clearOfflineWorkouts() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_offlineLogsKey);
+  }
+
+  static Future<void> replaceOfflineWorkouts(
+    List<Map<String, dynamic>> workouts,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (workouts.isEmpty) {
+      await prefs.remove(_offlineLogsKey);
+      return;
+    }
+    await prefs.setString(_offlineLogsKey, jsonEncode(workouts));
+  }
+
+  static Future<void> enqueueOfflineAction(Map<String, dynamic> action) async {
+    final prefs = await SharedPreferences.getInstance();
+    final existing = prefs.getString(_offlineActionsKey);
+    final actions = existing == null
+        ? <dynamic>[]
+        : jsonDecode(existing) as List<dynamic>;
+    actions.add({...action, 'queued_at': DateTime.now().toIso8601String()});
+    await prefs.setString(_offlineActionsKey, jsonEncode(actions));
+  }
+
+  static Future<List<Map<String, dynamic>>> loadOfflineActions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final existing = prefs.getString(_offlineActionsKey);
+    if (existing == null) return [];
+    final actions = jsonDecode(existing) as List<dynamic>;
+    return actions.cast<Map<String, dynamic>>();
+  }
+
+  static Future<void> replaceOfflineActions(
+    List<Map<String, dynamic>> actions,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (actions.isEmpty) {
+      await prefs.remove(_offlineActionsKey);
+      return;
+    }
+    await prefs.setString(_offlineActionsKey, jsonEncode(actions));
   }
 
   static const _activeWorkoutKey = 'apex_active_workout_v1';
@@ -166,5 +207,6 @@ class StorageService {
     await prefs.remove(_awsCfgKey);
     await prefs.remove(_aiProviderKey);
     await prefs.remove(_exerciseApiKey);
+    await prefs.remove(_offlineActionsKey);
   }
 }
