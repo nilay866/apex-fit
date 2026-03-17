@@ -8,7 +8,9 @@ import '../widgets/apex_button.dart';
 import '../repositories/workout_repository.dart';
 import '../services/storage_service.dart';
 import '../services/adaptive_logic.dart';
+import '../services/plan_generator_service.dart';
 import '../workout_engine/plate_calculator.dart';
+import '../widgets/pr_celebration_overlay.dart';
 import 'active_workout/widgets/rest_timer_banner.dart';
 import 'active_workout/widgets/session_footer.dart';
 import 'active_workout/widgets/smart_tip_banner.dart';
@@ -47,6 +49,13 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   Timer? _rRef;
   Timer? _tRef;
   String? _smartTip;
+
+  // NEW: PR celebration state
+  bool _showPrCelebration = false;
+  String? _prExerciseName;
+  double _prWeight = 0;
+  int _prReps = 0;
+  bool _hadPr = false;
 
   @override
   void initState() {
@@ -289,6 +298,40 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
     _saveState();
     if (s['type'] != 'drop') _startRest();
+
+    // NEW: Detect PR on set completion (compare to previous best)
+    if (s['done'] == true) {
+      _checkForPR(_cur, si);
+    }
+  }
+
+  // NEW: Check if a completed set is a PR
+  void _checkForPR(int exerciseIndex, int setIndex) {
+    try {
+      final exName = _exercises[exerciseIndex]['name'];
+      final setData = _logs[exerciseIndex]![setIndex];
+      final currentWeight = double.tryParse(setData['weight']?.toString() ?? '0') ?? 0;
+      final currentReps = int.tryParse(setData['reps']?.toString() ?? '0') ?? 0;
+      if (currentWeight <= 0 || currentReps <= 0) return;
+
+      // Check against previous sets
+      for (final prevSet in _previousSets) {
+        if (prevSet['exercise_name'] == exName) {
+          final prevWeight = double.tryParse(prevSet['weight_kg']?.toString() ?? '0') ?? 0;
+          if (currentWeight > prevWeight) {
+            setState(() {
+              _showPrCelebration = true;
+              _prExerciseName = exName?.toString() ?? 'Exercise';
+              _prWeight = currentWeight;
+              _prReps = currentReps;
+              _hadPr = true;
+            });
+            HapticFeedback.heavyImpact();
+            return;
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   void _upd(int ei, int si, String f, String v) {
@@ -466,13 +509,36 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     if (mounted) {
       setState(() => _saving = false);
     }
+
+    // NEW: Generate AI workout summary (non-blocking)
+    try {
+      final summary = await PlanGeneratorService.generateWorkoutSummary(
+        workoutName: widget.workout['name'] ?? 'Workout',
+        durationMin: (_timer / 60).round(),
+        totalVolume: _totalVol.round(),
+        setsCompleted: _doneCount,
+        hadPr: prMessage != null || _hadPr,
+      );
+      if (mounted && summary.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(summary),
+            backgroundColor: ApexColors.accent,
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
+    } catch (_) {}
+
     widget.onFinish();
   }
 
   @override
   Widget build(BuildContext context) {
     final ex = _cur < _exercises.length ? _exercises[_cur] : null;
-    return Scaffold(
+    return Stack(
+      children: [
+    Scaffold(
       backgroundColor: ApexColors.bg,
       body: SafeArea(
         child: Column(
@@ -848,6 +914,20 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
           ],
         ),
       ),
-    );
+    ),
+    // NEW: PR Celebration overlay
+    if (_showPrCelebration)
+      Positioned.fill(
+        child: PrCelebrationOverlay(
+          exerciseName: _prExerciseName ?? 'Exercise',
+          weightKg: _prWeight,
+          reps: _prReps,
+          onDismiss: () {
+            if (mounted) setState(() => _showPrCelebration = false);
+          },
+        ),
+      ),
+    ], // Stack children
+    ); // Stack
   }
 }

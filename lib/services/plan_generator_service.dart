@@ -39,6 +39,30 @@ Return ONLY valid JSON covering Week 1 to Week 4. For each week, define 'focus' 
       };
     }
   }
+
+  /// NEW: Generate a post-workout AI summary (2 sentences max).
+  static Future<String> generateWorkoutSummary({
+    required String workoutName,
+    required int durationMin,
+    required int totalVolume,
+    required int setsCompleted,
+    required bool hadPr,
+  }) async {
+    try {
+      final prText = hadPr ? ' The user hit at least one personal record.' : '';
+      final prompt = '''
+Write a 2-sentence motivating post-workout summary for a fitness app. 
+Be specific, concise, and encouraging. Do NOT use emojis or markdown.
+Workout: $workoutName, ${durationMin}min, ${totalVolume}kg total volume.$prText
+Sets completed: $setsCompleted.
+Summary:''';
+
+      final response = await AIService.generate(prompt);
+      return response.trim().replaceAll('"', '');
+    } catch (_) {
+      return 'Great session! Keep up the consistency.';
+    }
+  }
 }
 
 class SmartCoach {

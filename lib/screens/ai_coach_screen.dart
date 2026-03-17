@@ -4,8 +4,10 @@ import '../constants/colors.dart';
 import '../services/ai_service.dart';
 import '../services/plan_generator_service.dart';
 import '../services/supabase_service.dart';
+import '../services/coach_memory_service.dart';
 import '../widgets/apex_orb_logo.dart';
 import 'package:flutter/services.dart';
+import 'ai_insights_screen.dart';
 
 class AiCoachScreen extends StatefulWidget {
   final Map<String, dynamic>? profile;
@@ -24,12 +26,22 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
   final _scrollC = ScrollController();
   bool _thinking = false;
 
+  // NEW: AI Coach Memory
+  Map<String, dynamic> _coachMemory = {};
+
   static const _prompts = ['Best post-workout meal?', 'Build me a 5-day split', 'How to break plateau?', 'Am I overtraining?', 'Tips for fat loss?', 'Best exercises for back?'];
 
   void _scrollBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollC.hasClients) _scrollC.animateTo(_scrollC.position.maxScrollExtent, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
     });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // NEW: Load coach memory on init
+    _loadCoachMemory();
   }
 
   Future<void> _send() async {
@@ -51,6 +63,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
         weightKg: (widget.profile?['weight_kg'] as num?)?.toDouble(),
         heightCm: (widget.profile?['height_cm'] as num?)?.toDouble(),
         recentLogs: recentLogDescs,
+        memoryContext: CoachMemoryService.buildMemoryContext(_coachMemory),
       );
       setState(() => _msgs.add({'role': 'assistant', 'content': reply.trim()}));
     } catch (e) {
@@ -58,6 +71,41 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
     }
     setState(() => _thinking = false);
     _scrollBottom();
+
+    // NEW: Save memory after conversation (non-blocking)
+    if (_msgs.length >= 4) {
+      _saveMemoryAfterConversation(_msgs);
+    }
+  }
+
+  // NEW: Load coach memory from Supabase
+  Future<void> _loadCoachMemory() async {
+    try {
+      final uid = SupabaseService.currentUser?.id;
+      if (uid == null) return;
+      final memory = await SupabaseService.getAiCoachMemory(uid);
+      if (mounted) {
+        setState(() {
+          _coachMemory = memory;
+        });
+      }
+    } catch (_) {}
+  }
+
+  // NEW: Extract and save memory after conversation
+  Future<void> _saveMemoryAfterConversation(
+    List<Map<String, String>> messages,
+  ) async {
+    try {
+      final uid = SupabaseService.currentUser?.id;
+      if (uid == null) return;
+      final newFacts = await CoachMemoryService.extractKeyFacts(messages);
+      if (newFacts.isNotEmpty) {
+        final merged = CoachMemoryService.mergeMemory(_coachMemory, newFacts);
+        await SupabaseService.saveAiCoachMemory(uid, merged);
+        if (mounted) setState(() => _coachMemory = merged);
+      }
+    } catch (_) {}
   }
 
   bool _showPlanner = false;
@@ -85,6 +133,23 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                       const SizedBox(height: 4),
                       Text('Context-aware training help for your current profile.', style: TextStyle(fontSize: 11, color: ApexColors.t2)),
                     ]),
+                  ),
+                  // NEW: AI Insights shortcut
+                  IconButton(
+                    key: const ValueKey('ai_insights_button'),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const AiInsightsScreen(),
+                      ),
+                    ),
+                    icon: const Icon(
+                      Icons.insights_rounded,
+                      color: ApexColors.accent,
+                    ),
+                    style: IconButton.styleFrom(
+                      backgroundColor: ApexColors.accent.withAlpha(20),
+                      padding: const EdgeInsets.all(10),
+                    ),
                   ),
                 ],
               ),

@@ -11,6 +11,7 @@ import '../widgets/macro_bar.dart';
 import '../widgets/heatmaps_painter.dart';
 import '../services/supabase_service.dart';
 import '../services/plan_generator_service.dart';
+import '../services/progress_forecast_service.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -30,6 +31,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
   bool _savingBw = false;
   String? _waterError;
   bool _show1RM = false;
+
+  // NEW: Forecast state
+  String? _predictionLabel;
 
   @override
   void initState() {
@@ -70,11 +74,43 @@ class _ReportsScreenState extends State<ReportsScreen> {
         _waterError = waterError;
         _loading = false;
       });
+
+      // NEW: Compute forecast after data loads
+      _computeForecast();
     } catch (e) {
       if (mounted) {
         setState(() => _loading = false);
       }
     }
+  }
+
+  // NEW: Compute forecast from set logs
+  void _computeForecast() {
+    try {
+      // Build historical data from workout logs for forecast
+      final strengthData = _wLogs
+          .where((l) => (l['total_volume'] as num?) != null)
+          .map((l) => {
+                'date': (l['completed_at']?.toString() ?? '').split('T')[0],
+                'weight': ((l['total_volume'] as num?)?.toDouble() ?? 0),
+              })
+          .toList()
+          .reversed
+          .toList();
+
+      if (strengthData.length >= 3) {
+        final label = ProgressForecastService.buildPredictionLabel(
+          historicalData: strengthData,
+          targetWeight:
+              (strengthData.last['weight'] as double? ?? 0) * 1.1,
+        );
+        if (mounted) {
+          setState(() {
+            _predictionLabel = label;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _logBw() async {
@@ -325,6 +361,44 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
             ),
             const SizedBox(height: 12),
+            // NEW: Prediction label
+            if (_predictionLabel != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: ApexColors.accentSoft.withAlpha(18),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: ApexColors.accentSoft.withAlpha(60),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.trending_up_rounded,
+                        color: ApexColors.accentSoft,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _predictionLabel!,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: ApexColors.accentSoft,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ApexCard(
               glow: true,
               glowColor: ApexColors.orange,

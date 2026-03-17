@@ -14,6 +14,7 @@ import '../widgets/apex_screen_header.dart';
 import '../widgets/apex_orb_logo.dart';
 import '../services/supabase_service.dart';
 import '../services/cache_service.dart';
+import '../screens/challenges_screen.dart';
 import 'social_feed/widgets/social_post_card.dart';
 
 class SocialFeedScreen extends StatefulWidget {
@@ -205,17 +206,40 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
                   title: 'Social Feed',
                   subtitle:
                       'Real-time activity and routine syndication from your circles.',
-                  trailing: IconButton(
-                    key: const ValueKey('social_add_community_button'),
-                    onPressed: _showAddCommunity,
-                    icon: const Icon(
-                      Icons.person_add_alt_1_rounded,
-                      color: ApexColors.accent,
-                    ),
-                    style: IconButton.styleFrom(
-                      backgroundColor: ApexColors.accent.withAlpha(20),
-                      padding: const EdgeInsets.all(12),
-                    ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // NEW: Challenges shortcut
+                      IconButton(
+                        key: const ValueKey('social_challenges_button'),
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const ChallengesScreen(),
+                          ),
+                        ),
+                        icon: const Icon(
+                          Icons.emoji_events_rounded,
+                          color: ApexColors.yellow,
+                        ),
+                        style: IconButton.styleFrom(
+                          backgroundColor: ApexColors.yellow.withAlpha(20),
+                          padding: const EdgeInsets.all(12),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        key: const ValueKey('social_add_community_button'),
+                        onPressed: _showAddCommunity,
+                        icon: const Icon(
+                          Icons.person_add_alt_1_rounded,
+                          color: ApexColors.accent,
+                        ),
+                        style: IconButton.styleFrom(
+                          backgroundColor: ApexColors.accent.withAlpha(20),
+                          padding: const EdgeInsets.all(12),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

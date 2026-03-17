@@ -19,6 +19,10 @@ import '../services/supabase_service.dart';
 import '../services/cache_service.dart';
 import '../services/achievement_service.dart';
 import '../widgets/achievement_badges.dart';
+import '../services/nfi_service.dart';
+import '../widgets/nfi_ring_widget.dart';
+import '../widgets/mood_checkin_widget.dart';
+import '../widgets/quick_action_fab.dart';
 import 'workout_programs_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -56,6 +60,10 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _waterError;
   Timer? _offlineSyncTimer;
 
+  // NEW: NFI + Mood state
+  NfiResult? _nfiResult;
+  bool _nfiLoading = true;
+
   @override
   void initState() {
     super.initState();
@@ -81,6 +89,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     _load();
+
+    // NEW: Load NFI score
+    _loadNfi();
   }
 
   int _calculateTotalWater(List<Map<String, dynamic>> logs) {
@@ -166,6 +177,23 @@ class _HomeScreenState extends State<HomeScreen> {
       _loadSuggestion();
     } catch (e) {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  // NEW: Load NFI recovery score
+  Future<void> _loadNfi() async {
+    try {
+      final uid = SupabaseService.currentUser?.id;
+      if (uid == null) return;
+      final result = await NfiService.computeToday(uid);
+      if (mounted) {
+        setState(() {
+          _nfiResult = result;
+          _nfiLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _nfiLoading = false);
     }
   }
 
@@ -427,6 +455,30 @@ class _HomeScreenState extends State<HomeScreen> {
             trailing: _streak > 0 ? _streakBadge() : null,
           ),
           const SizedBox(height: 12),
+          // NEW: NFI Recovery Ring
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: NfiRingWidget(result: _nfiResult, isLoading: _nfiLoading),
+          ),
+          
+          // NEW: Quick Action FAB inline
+          QuickActionFab(
+            onStartWorkout: () => widget.onStartWorkout({}),
+            onLogMeal: _openLogMealSheet,
+            onAddWater: () => setState(() => _addWater = !_addWater),
+          ),
+          
+          // NEW: Mood check-in
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: MoodCheckinWidget(
+              initialMood: 3,
+              onMoodChanged: (mood) {
+                // Trigger NFI recompute with mood
+                _loadNfi();
+              },
+            ),
+          ),
           Align(
             alignment: Alignment.centerLeft,
             child: FutureBuilder<bool>(

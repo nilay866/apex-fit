@@ -17,6 +17,7 @@ import 'reports_screen.dart';
 import 'workout_screen.dart';
 import 'circuit_player_screen.dart';
 import 'cardio_map_screen.dart';
+import 'track_setup_screen.dart';
 
 class MainShell extends StatefulWidget {
   final VoidCallback onSignOut;
@@ -41,6 +42,7 @@ class _MainShellState extends State<MainShell> {
 
   static const _navItems = [
     {'icon': Icons.home_rounded, 'label': 'Home'},
+    {'icon': Icons.explore_rounded, 'label': 'Track'},
     {'icon': Icons.fitness_center_rounded, 'label': 'Train'},
     {'icon': Icons.public_rounded, 'label': 'Social'},
     {'icon': Icons.bar_chart_rounded, 'label': 'Stats'},
@@ -196,6 +198,7 @@ class _MainShellState extends State<MainShell> {
                       profile: _profile,
                       onStartWorkout: _startWorkout,
                     ),
+                    TrackSetupScreen(onStartWorkout: _startWorkout),
                     WorkoutScreen(onStartWorkout: _startWorkout),
                     const SocialFeedScreen(),
                     const ReportsScreen(),

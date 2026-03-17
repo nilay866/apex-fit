@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'ai/ai_provider.dart';
 import 'ai/gemini_provider.dart';
 import 'ai/bedrock_provider.dart';
@@ -48,8 +49,8 @@ class AIService {
       }
       throw Exception('Parsed JSON is not a Map');
     } catch (e) {
-      print('AI JSON Parse Error: $e');
-      print('Raw AI Output: $raw');
+      debugPrint('AI JSON Parse Error: $e');
+      debugPrint('Raw AI Output: $raw');
       throw Exception('Could not parse JSON from AI: $e');
     }
   }
@@ -147,7 +148,7 @@ Realistic values, 100g default if no qty given.''';
       _nutritionCache[cacheKey] = Map<String, dynamic>.from(parsed);
       return parsed;
     } catch (e) {
-      print('AI Nutrition Error for "$food": $e');
+      debugPrint('AI Nutrition Error for "$food": $e');
       final fallback = {
         'calories': 250,
         'protein_g': 15,
@@ -185,17 +186,59 @@ Suggest one workout in 1 sentence. Max 25 words. Name specific muscles.''';
     double? weightKg,
     double? heightCm,
     required List<String> recentLogs,
+    String memoryContext = '',
   }) async {
     final history = messages
         .map(
           (m) => '${m["role"] == "user" ? "User" : "Coach"}: ${m["content"]}',
         )
         .join('\n');
+    final memoryBlock = memoryContext.isNotEmpty ? '\n$memoryContext\n' : '';
     final system =
         '''You are an expert AI fitness coach in the APEX AI app. Be direct, specific, and motivating. Max 150 words unless asked more. Bullet points for lists.
 Athlete: $athleteName | Goal: $goal | Weight: ${weightKg ?? '?'}kg | Height: ${heightCm ?? '?'}cm
-Recent: ${recentLogs.isNotEmpty ? recentLogs.join(', ') : 'none'}''';
+Recent: ${recentLogs.isNotEmpty ? recentLogs.join(', ') : 'none'}$memoryBlock''';
     return await generate('$system\n\n---\n$history\nCoach:');
+  }
+
+  /// NEW: Adaptive Training incorporating Activity & Recovery metrics
+  static Future<Map<String, dynamic>> generateAdaptiveWorkout({
+    required String goal,
+    required String level,
+    required String equipment,
+    required String focus,
+    required int recoveryScore,
+    required List<Map<String, dynamic>> recentActivities,
+    required List<Map<String, dynamic>> recentHealthMetrics,
+  }) async {
+    final recentActs = recentActivities.take(3).map((a) {
+      return '${a['type']} (${(a['distance_km'] ?? 0).toStringAsFixed(1)}km)';
+    }).join(', ');
+    
+    final prompt = '''You are an elite fitness coach. Create an adaptive workout for a $level user using $equipment.
+Goal: $goal | Focus: $focus | Current Recovery Score: $recoveryScore/100
+Recent Cardio: ${recentActs.isEmpty ? 'None' : recentActs}
+
+If Recovery is < 40, suggest active recovery, mobility, or very light cardio.
+If Recovery is > 70, push them hard (high volume/intensity).
+Otherwise, standard progression.
+Take into account recent cardio (e.g., if they ran 10km yesterday, avoid heavy leg day if recovery isn't perfect).
+
+Reply ONLY valid JSON no markdown:
+{"name":"Workout Name","type":"Gym","exercises":[{"name":"Exercise","sets":3,"reps":"8-12","target_weight":"60"}]}
+Include 4-6 exercises. type must be Gym, Calisthenics, HIIT, Mobility, or Recovery.''';
+
+    try {
+      final raw = await generate(prompt);
+      final parsed = _extractJson(raw);
+      if (parsed['name'] == null || parsed['exercises'] == null) {
+        throw Exception('Invalid AI response');
+      }
+      return parsed;
+    } catch (_) {
+      // Fallback
+      return _defaultWorkout(goal: goal, focus: focus);
+    }
   }
 
   static Future<bool> testConnection({String? geminiApiKey}) async {

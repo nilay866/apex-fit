@@ -148,7 +148,6 @@ class SupabaseService {
     );
     
     final googleUser = await _retry(() => google_auth.GoogleSignIn.instance.authenticate());
-    if (googleUser == null) return false;
     
     final googleAuth = googleUser.authentication;
     final idToken = googleAuth.idToken;
@@ -2474,5 +2473,230 @@ class SupabaseService {
     } catch (e) {
       return false;
     }
+  }
+
+  // ─── NEW: AI Coach Memory ────────────────────────────────────────────────────
+
+  /// NEW: Get AI coach memory object for user
+  static Future<Map<String, dynamic>> getAiCoachMemory(String userId) async {
+    try {
+      final res = await client
+          .from('profiles')
+          .select('ai_coach_memory')
+          .eq('id', userId)
+          .maybeSingle();
+      return (res?['ai_coach_memory'] as Map<String, dynamic>?) ?? {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// NEW: Save updated AI coach memory
+  static Future<void> saveAiCoachMemory(
+    String userId,
+    Map<String, dynamic> memory,
+  ) async {
+    try {
+      await client
+          .from('profiles')
+          .update({'ai_coach_memory': memory})
+          .eq('id', userId);
+    } catch (_) {}
+  }
+
+  /// NEW: Save a coach conversation session
+  static Future<void> saveAiCoachSession({
+    required String userId,
+    required List<Map<String, dynamic>> messages,
+    String? summary,
+    Map<String, dynamic>? keyFacts,
+  }) async {
+    try {
+      await client.from('ai_coach_sessions').insert({
+        'user_id': userId,
+        'messages': messages,
+        'summary': summary,
+        'key_facts': keyFacts ?? {},
+      });
+    } catch (_) {}
+  }
+
+  // ─── NEW: Mood Tracking ──────────────────────────────────────────────────────
+
+  /// NEW: Save user mood for today
+  static Future<void> saveMoodToday(String userId, int mood) async {
+    try {
+      await client.from('profiles').update({
+        'today_mood': mood.clamp(1, 5),
+        'mood_updated_at': DateTime.now().toIso8601String().split('T')[0],
+      }).eq('id', userId);
+    } catch (_) {}
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // NEW: Activities — GPS-tracked sessions
+  // ═══════════════════════════════════════════════════════════════════════
+
+  static Future<Map<String, dynamic>> createActivity(
+    Map<String, dynamic> activity,
+  ) async {
+    final res = await _retry(
+      () => client.from('activities').insert(activity).select().single(),
+    );
+    return Map<String, dynamic>.from(res as Map);
+  }
+
+  static Future<List<Map<String, dynamic>>> getActivities(
+    String userId, {
+    int limit = 20,
+  }) async {
+    final res = await _retry(
+      () => client
+          .from('activities')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .limit(limit),
+    );
+    return (res as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  static Future<Map<String, dynamic>?> getActivityById(
+    String activityId,
+  ) async {
+    try {
+      final res = await _retry(
+        () => client.from('activities').select().eq('id', activityId).single(),
+      );
+      return Map<String, dynamic>.from(res as Map);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // NEW: GPS Points
+  // ═══════════════════════════════════════════════════════════════════════
+
+  static Future<void> createGpsPoints(
+    List<Map<String, dynamic>> points,
+  ) async {
+    if (points.isEmpty) return;
+    // Insert in batches of 500
+    for (var i = 0; i < points.length; i += 500) {
+      final batch = points.sublist(
+        i,
+        i + 500 > points.length ? points.length : i + 500,
+      );
+      await _retry(() => client.from('gps_points').insert(batch));
+    }
+  }
+
+  static Future<List<Map<String, dynamic>>> getGpsPoints(
+    String activityId,
+  ) async {
+    final res = await _retry(
+      () => client
+          .from('gps_points')
+          .select()
+          .eq('activity_id', activityId)
+          .order('recorded_at'),
+    );
+    return (res as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // NEW: Health Metrics
+  // ═══════════════════════════════════════════════════════════════════════
+
+  static Future<void> upsertHealthMetrics(
+    Map<String, dynamic> metrics,
+  ) async {
+    await _retry(
+      () => client.from('health_metrics').upsert(
+        metrics,
+        onConflict: 'user_id,recorded_at',
+      ),
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> getHealthMetricsSince(
+    String userId,
+    String sinceDate,
+  ) async {
+    final res = await _retry(
+      () => client
+          .from('health_metrics')
+          .select()
+          .eq('user_id', userId)
+          .gte('recorded_at', sinceDate)
+          .order('recorded_at', ascending: false),
+    );
+    return (res as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // NEW: Water Logs
+  // ═══════════════════════════════════════════════════════════════════════
+
+  static Future<void> logWater(String userId, int amountMl) async {
+    await _retry(
+      () => client.from('water_logs').insert({
+        'user_id': userId,
+        'amount_ml': amountMl,
+      }),
+    );
+  }
+
+  static Future<int> getTodayWater(String userId) async {
+    final today = DateTime.now().toIso8601String().split('T').first;
+    final res = await _retry(
+      () => client
+          .from('water_logs')
+          .select('amount_ml')
+          .eq('user_id', userId)
+          .gte('logged_at', '${today}T00:00:00'),
+    );
+    final list = res as List;
+    int total = 0;
+    for (final r in list) {
+      total += ((r as Map)['amount_ml'] as int?) ?? 0;
+    }
+    return total;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // NEW: Training Load
+  // ═══════════════════════════════════════════════════════════════════════
+
+  static Future<void> upsertTrainingLoad(
+    Map<String, dynamic> load,
+  ) async {
+    await _retry(
+      () => client.from('training_load').upsert(
+        load,
+        onConflict: 'user_id,week_start',
+      ),
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> getTrainingLoadHistory(
+    String userId, {
+    int weeks = 12,
+  }) async {
+    final since = DateTime.now()
+        .subtract(Duration(days: weeks * 7))
+        .toIso8601String()
+        .split('T')
+        .first;
+    final res = await _retry(
+      () => client
+          .from('training_load')
+          .select()
+          .eq('user_id', userId)
+          .gte('week_start', since)
+          .order('week_start', ascending: false),
+    );
+    return (res as List).map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 }

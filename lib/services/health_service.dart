@@ -69,4 +69,100 @@ class HealthService {
       'energy': energy,
     };
   }
+
+  /// NEW: Pull HRV, sleep, and resting HR for NFI computation.
+  /// Returns safe defaults when data is unavailable from Apple Health.
+  static Future<Map<String, dynamic>> getTodayHealthSnapshot() async {
+    double? hrvMs;
+    double? sleepHours;
+    double? restingHr;
+
+    if (!await isSyncEnabled()) {
+      return {
+        'hrv_ms': hrvMs,
+        'sleep_hours': sleepHours,
+        'resting_hr': restingHr,
+      };
+    }
+
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final yesterday = startOfDay.subtract(const Duration(hours: 12));
+
+    try {
+      final types = <HealthDataType>[];
+
+      // HRV
+      try {
+        types.add(HealthDataType.HEART_RATE_VARIABILITY_SDNN);
+      } catch (_) {}
+
+      // Resting HR
+      try {
+        types.add(HealthDataType.RESTING_HEART_RATE);
+      } catch (_) {}
+
+      if (types.isNotEmpty) {
+        try {
+          await _health.requestAuthorization(types);
+        } catch (_) {}
+
+        try {
+          final healthData = await _health.getHealthDataFromTypes(
+            startTime: yesterday,
+            endTime: now,
+            types: types,
+          );
+
+          for (var data in healthData) {
+            try {
+              if (data.type == HealthDataType.HEART_RATE_VARIABILITY_SDNN) {
+                final val =
+                    (data.value as NumericHealthValue).numericValue.toDouble();
+                if (hrvMs == null || val > hrvMs) hrvMs = val;
+              } else if (data.type == HealthDataType.RESTING_HEART_RATE) {
+                final val =
+                    (data.value as NumericHealthValue).numericValue.toDouble();
+                if (restingHr == null || val < restingHr) restingHr = val;
+              }
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
+
+      // Sleep — try to read SLEEP_ASLEEP or SLEEP_IN_BED
+      try {
+        final sleepTypes = [HealthDataType.SLEEP_ASLEEP];
+        try {
+          await _health.requestAuthorization(sleepTypes);
+        } catch (_) {}
+
+        final sleepData = await _health.getHealthDataFromTypes(
+          startTime: yesterday,
+          endTime: now,
+          types: sleepTypes,
+        );
+
+        double totalSleepMin = 0;
+        for (var data in sleepData) {
+          try {
+            final durationMin =
+                data.dateTo.difference(data.dateFrom).inMinutes.toDouble();
+            totalSleepMin += durationMin;
+          } catch (_) {}
+        }
+        if (totalSleepMin > 0) {
+          sleepHours = totalSleepMin / 60.0;
+        }
+      } catch (_) {}
+    } catch (_) {
+      // Ignore all health fetch errors
+    }
+
+    return {
+      'hrv_ms': hrvMs,
+      'sleep_hours': sleepHours,
+      'resting_hr': restingHr,
+    };
+  }
 }

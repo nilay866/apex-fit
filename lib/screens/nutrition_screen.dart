@@ -9,6 +9,7 @@ import '../widgets/macro_bar.dart';
 import '../widgets/apex_screen_header.dart';
 import '../services/supabase_service.dart';
 import '../services/ai_service.dart';
+import '../services/nutrition_targets_service.dart';
 
 class NutritionScreen extends StatefulWidget {
   const NutritionScreen({super.key});
@@ -30,10 +31,15 @@ class _NutritionScreenState extends State<NutritionScreen> {
   String _aiErr = '';
   bool _saving = false;
 
+  // NEW: Dynamic nutrition targets
+  NutritionTargets? _dynamicTargets;
+
   @override
   void initState() {
     super.initState();
     _load();
+    // NEW: Load dynamic nutrition targets
+    _loadDynamicTargets();
   }
 
   Future<void> _load() async {
@@ -52,6 +58,18 @@ class _NutritionScreenState extends State<NutritionScreen> {
     } catch (e) {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  // NEW: Load dynamic nutrition targets based on training day
+  Future<void> _loadDynamicTargets() async {
+    try {
+      final uid = SupabaseService.currentUser?.id;
+      if (uid == null) return;
+      final profile = await SupabaseService.getProfile(uid) ?? {};
+      final targets =
+          await NutritionTargetsService.computeForToday(uid, profile);
+      if (mounted) setState(() => _dynamicTargets = targets);
+    } catch (_) {}
   }
 
   Future<void> _saveMeal() async {
@@ -464,6 +482,58 @@ class _NutritionScreenState extends State<NutritionScreen> {
               subtitle: "Today's intake, macros, and meal history.",
             ),
             const SizedBox(height: 14),
+            // NEW: Training day / rest day target banner
+            if (_dynamicTargets != null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: (_dynamicTargets!.isTrainingDay
+                            ? ApexColors.accentSoft
+                            : ApexColors.blue)
+                        .withAlpha(18),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: (_dynamicTargets!.isTrainingDay
+                              ? ApexColors.accentSoft
+                              : ApexColors.blue)
+                          .withAlpha(60),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _dynamicTargets!.isTrainingDay
+                            ? Icons.fitness_center_rounded
+                            : Icons.self_improvement_rounded,
+                        size: 16,
+                        color: _dynamicTargets!.isTrainingDay
+                            ? ApexColors.accentSoft
+                            : ApexColors.blue,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _dynamicTargets!.isTrainingDay
+                              ? 'Training day — targets boosted (+300 kcal)'
+                              : 'Rest day — reduced carbs for recomposition',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _dynamicTargets!.isTrainingDay
+                                ? ApexColors.accentSoft
+                                : ApexColors.blue,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ApexCard(
               glow: true,
               child: Column(

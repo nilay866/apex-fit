@@ -8,6 +8,7 @@ import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
 import 'package:geolocator/geolocator.dart';
 import '../constants/colors.dart';
 import '../services/supabase_service.dart';
+import 'tracking_summary_screen.dart';
 
 typedef RunStateCallback =
     void Function({
@@ -51,6 +52,9 @@ class _CardioMapScreenState extends State<CardioMapScreen> {
 
   // Live speed (m/s from GPS)
   double _currentSpeedMs = 0;
+  
+  // NEW: Store raw GPS points for the new tracking system
+  final List<Map<String, dynamic>> _gpsPoints = [];
 
   // User profile weight for calorie calculation
   double _userWeightKg = 70.0;
@@ -160,6 +164,17 @@ class _CardioMapScreenState extends State<CardioMapScreen> {
                 ? position.speed
                 : _currentSpeedMs;
 
+            // NEW: Record GPS point for summary
+            _gpsPoints.add({
+              'lat': position.latitude,
+              'lng': position.longitude,
+              'elevation': position.altitude,
+              'speed': position.speed,
+              'heart_rate': null, // Need external HR sensor for this
+              'cadence': null,
+              'recorded_at': DateTime.now().toIso8601String(),
+            });
+
             // Split tracking — record each completed km
             final currentKm = _totalDistanceMeters / 1000;
             if (currentKm - _lastSplitKm >= 1.0) {
@@ -184,24 +199,49 @@ class _CardioMapScreenState extends State<CardioMapScreen> {
   Future<void> _finishWorkout() async {
     HapticFeedback.heavyImpact();
     _pauseTracking();
-    try {
-      await SupabaseService.createWorkoutLog({
-        'user_id': SupabaseService.requireUserId(
-          action: 'save your cardio workout',
+
+    // Calculate total elevation gain/loss from _gpsPoints
+    double elevationGain = 0;
+    double elevationLoss = 0;
+    for (var i = 1; i < _gpsPoints.length; i++) {
+      final prev = (_gpsPoints[i - 1]['elevation'] as num?)?.toDouble() ?? 0;
+      final curr = (_gpsPoints[i]['elevation'] as num?)?.toDouble() ?? 0;
+      final diff = curr - prev;
+      if (diff > 0) {
+        elevationGain += diff;
+      } else if (diff < 0) {
+        elevationLoss += diff.abs();
+      }
+    }
+
+    final distanceKm = _totalDistanceMeters / 1000;
+    final maxSpeed = _gpsPoints.isEmpty 
+      ? 0.0 
+      : _gpsPoints.map((p) => (p['speed'] as num?)?.toDouble() ?? 0.0)
+          .reduce((a, b) => a > b ? a : b) * 3.6; // m/s to km/h
+
+    // Close the live map completely
+    widget.onFinish();
+
+    // Push the summary screen
+    if (mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => TrackingSummaryScreen(
+            activityType: widget.workout['activityType'] ?? 'run',
+            distanceKm: distanceKm,
+            durationSeconds: _elapsedSeconds,
+            avgPace: _paceMinPerKm,
+            maxSpeed: maxSpeed,
+            elevationGain: elevationGain,
+            elevationLoss: elevationLoss,
+            splits: _splits,
+            gpsPoints: _gpsPoints,
+            userWeightKg: _userWeightKg,
+          ),
         ),
-        'workout_name': widget.workout['name'] ?? 'Outdoor Run',
-        'duration_min': (_elapsedSeconds / 60).round(),
-        'total_volume': 0,
-        'intensity': 'moderate',
-        'completed_at': DateTime.now().toIso8601String(),
-        'notes':
-            'Distance: ${(_totalDistanceMeters / 1000).toStringAsFixed(2)} km | '
-            'Pace: $_formattedPace /km | '
-            'Calories: ${_kcal.round()} kcal | '
-            'Splits: ${_splits.map((s) => 'km${s['km']}=${_formatSeconds(s['seconds'])}').join(', ')}',
-      });
-    } catch (_) {}
-    if (mounted) widget.onFinish();
+      );
+    }
   }
 
   // ─── Computed getters ────────────────────────────────────────────────────
@@ -231,12 +271,6 @@ class _CardioMapScreenState extends State<CardioMapScreen> {
   double get _kcal {
     final hours = _elapsedSeconds / 3600;
     return 9.0 * _userWeightKg * hours;
-  }
-
-  String _formatSeconds(int secs) {
-    final m = (secs ~/ 60).toString().padLeft(2, '0');
-    final s = (secs % 60).toString().padLeft(2, '0');
-    return '$m:$s';
   }
 
   // Split pace string for a split
