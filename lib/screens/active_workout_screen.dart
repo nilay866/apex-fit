@@ -11,9 +11,9 @@ import '../services/adaptive_logic.dart';
 import '../services/plan_generator_service.dart';
 import '../workout_engine/plate_calculator.dart';
 import '../widgets/pr_celebration_overlay.dart';
+import 'exercise_library_screen.dart';
 import 'active_workout/widgets/rest_timer_banner.dart';
 import 'active_workout/widgets/session_footer.dart';
-import 'active_workout/widgets/smart_tip_banner.dart';
 import 'active_workout/widgets/workout_header.dart';
 import 'active_workout/widgets/workout_set_row.dart';
 
@@ -48,7 +48,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   bool _showEnd = false;
   Timer? _rRef;
   Timer? _tRef;
-  String? _smartTip;
+  // String? _smartTip; // Removed unused smart tip code
 
   // NEW: PR celebration state
   bool _showPrCelebration = false;
@@ -90,6 +90,29 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
         if (_timer % 10 == 0) _saveState(); // Auto-save every 10s
       }
     });
+  }
+
+  void _addExerciseFromLibrary() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ExerciseLibraryScreen(
+          onSelect: (ex) {
+            setState(() {
+              _exercises.add({
+                'name': ex['name'],
+                'target_weight': null,
+              });
+              _logs[_exercises.length - 1] = [
+                {'reps': '10', 'weight': '', 'done': false, 'type': 'normal'},
+              ];
+              _cur = _exercises.length - 1;
+            });
+            Navigator.pop(context);
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _checkRecoveredState() async {
@@ -196,12 +219,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   String _fmt(int s) =>
       '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
 
-  void _selectExercise(int index) {
-    setState(() => _cur = index);
-    _exNoteC.text = _exNotes[index] ?? '';
-    _saveState();
-  }
-
   Map<String, dynamic>? _previousSetFor(String exerciseName, int setNumber) {
     for (final prevSet in _previousSets) {
       if (prevSet['exercise_name'] == exerciseName &&
@@ -290,10 +307,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       targetReps: targetReps,
     );
     if (suggest != null) {
-      setState(() => _smartTip = suggest);
-      Future.delayed(const Duration(seconds: 8), () {
-        if (mounted) setState(() => _smartTip = null);
-      });
+      // Smart tip UI disabled in the current aesthetic
     }
 
     _saveState();
@@ -535,7 +549,6 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ex = _cur < _exercises.length ? _exercises[_cur] : null;
     return Stack(
       children: [
     Scaffold(
@@ -564,337 +577,43 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               ),
 
             // Exercise tabs
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Row(
-                children: [
-                  ..._exercises.asMap().entries.map((entry) {
-                    final i = entry.key;
-                    final e = entry.value;
-                    final d = (_logs[i] ?? [])
-                        .where((s) => s['done'] == true)
-                        .length;
-                    final t = (_logs[i] ?? []).length;
-                    final all = d == t && t > 0;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 7),
-                      child: GestureDetector(
-                        onTap: () => _selectExercise(i),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 11,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _cur == i
-                                ? ApexColors.card
-                                : Colors.transparent,
-                            border: Border.all(
-                              color: _cur == i
-                                  ? ApexColors.border
-                                  : Colors.transparent,
-                            ),
-                            borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(8),
-                            ),
-                          ),
-                          child: Text(
-                            '${all ? '✓ ' : ''}${e['name']}',
-                            style: TextStyle(
-                              color: all
-                                  ? ApexColors.accent
-                                  : (_cur == i ? ApexColors.t1 : ApexColors.t3),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            ),
-            Divider(color: ApexColors.border, height: 1),
-
-            if (_smartTip != null) SmartTipBanner(message: _smartTip!),
-
-            // Set logging
+            // Unified Exercises List
             Expanded(
-              child: ex == null
-                  ? const SizedBox()
-                  : ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                        Text(
-                          ex['name'] ?? '',
-                          style: GoogleFonts.inter(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: ApexColors.t1,
-                          ),
-                        ),
-                        Text(
-                          'Edit each set independently',
-                          style: TextStyle(color: ApexColors.t2, fontSize: 10),
-                        ),
-                        const SizedBox(height: 12),
-                        // Header
-                        Row(
-                          children: [
-                            SizedBox(
-                              width: 34,
-                              child: Text(
-                                '#',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: ApexColors.t3,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
+              child: _exercises.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.fitness_center_rounded,
+                              size: 48, color: ApexColors.t3),
+                          const SizedBox(height: 16),
+                          Text('No exercises yet',
+                              style: GoogleFonts.inter(
+                                  color: ApexColors.t2, fontSize: 16)),
+                          const SizedBox(height: 24),
+                          ApexButton(
+                            text: 'Add Exercise',
+                            onPressed: _addExerciseFromLibrary,
+                          )
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 150),
+                      itemCount: _exercises.length + 1,
+                      itemBuilder: (ctx, ei) {
+                        if (ei == _exercises.length) {
+                          return Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+                            child: ApexButton(
+                              text: '+ Add Exercise',
+                              outline: true,
+                              onPressed: _addExerciseFromLibrary,
                             ),
-                            Expanded(
-                              child: Text(
-                                'REPS',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: ApexColors.t3,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                'KG',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: ApexColors.t3,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(
-                              width: 40,
-                              child: Text(
-                                '✓',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: ApexColors.t3,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 5),
-                        ...(_logs[_cur] ?? []).asMap().entries.map((entry) {
-                          final si = entry.key;
-                          final s = entry.value;
-                          final prevSet = _previousSetFor(ex['name'], si + 1);
-                          final pReps = prevSet?['reps_done']?.toString() ?? '';
-                          final pWeight =
-                              prevSet?['weight_kg']?.toString() ?? '';
-                          return WorkoutSetRow(
-                            key: ValueKey('$_cur-$si'),
-                            setNumber: si + 1,
-                            setData: s,
-                            previousReps: pReps,
-                            previousWeight: pWeight,
-                            deltaPercent: _deltaPercentForSet(
-                              ex['name'],
-                              si + 1,
-                              s,
-                            ),
-                            onToggleType: () => _toggleType(_cur, si),
-                            onRepsChanged: (v) => _upd(_cur, si, 'reps', v),
-                            onWeightChanged: (v) => _upd(_cur, si, 'weight', v),
-                            onFieldTap: () => setState(() {
-                              _focusedEx = _cur;
-                              _focusedSet = si;
-                            }),
-                            onWeightLongPress: () {
-                              HapticFeedback.mediumImpact();
-                              final currentWeight =
-                                  double.tryParse(
-                                    s['weight']?.toString() ?? '0',
-                                  ) ??
-                                  0;
-                              showPlateCalculator(
-                                context,
-                                initialWeight: currentWeight > 0
-                                    ? currentWeight
-                                    : 60,
-                              );
-                            },
-                            onToggleDone: () => _toggle(_cur, si),
                           );
-                        }),
-                        GestureDetector(
-                          onTap: () => _addSet(_cur),
-                          child: Container(
-                            margin: const EdgeInsets.only(top: 9),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: ApexColors.border,
-                                style: BorderStyle.solid,
-                              ),
-                              borderRadius: BorderRadius.circular(9),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Add set',
-                                style: TextStyle(
-                                  color: ApexColors.t2,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        Text(
-                          'QUICK ADD (Set ${_focusedSet != null ? _focusedSet! + 1 : '-'})',
-                          style: TextStyle(
-                            color: ApexColors.t3,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [2.5, 5.0, 10.0, 15.0, 20.0, 25.0]
-                                .map(
-                                  (v) => Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        if (_focusedEx != null &&
-                                            _focusedSet != null) {
-                                          final setMap =
-                                              _logs[_focusedEx]![_focusedSet!];
-                                          final currentW =
-                                              double.tryParse(
-                                                setMap['weight']?.toString() ??
-                                                    '0',
-                                              ) ??
-                                              0;
-                                          String newW = (currentW + v)
-                                              .toString();
-                                          if (newW.endsWith('.0')) {
-                                            newW = newW.substring(
-                                              0,
-                                              newW.length - 2,
-                                            );
-                                          }
-                                          _upd(
-                                            _focusedEx!,
-                                            _focusedSet!,
-                                            'weight',
-                                            newW,
-                                          );
-                                        }
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 12,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: ApexColors.surface,
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          border: Border.all(
-                                            color: ApexColors.border,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          '+$v',
-                                          style: TextStyle(
-                                            color: ApexColors.t1,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        TextField(
-                          controller: _exNoteC,
-                          onChanged: (v) {
-                            _exNotes[_cur] = v;
-                            _saveState();
-                          },
-                          maxLines: 2,
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: ApexColors.t1,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: 'Notes for ${ex['name']}...',
-                            hintStyle: TextStyle(
-                              color: ApexColors.t3,
-                              fontSize: 12,
-                            ),
-                            filled: true,
-                            fillColor: ApexColors.surface,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 12,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide(color: ApexColors.border),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide(color: ApexColors.blue),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            if (_cur > 0)
-                              Expanded(
-                                child: ApexButton(
-                                  text: 'Previous',
-                                  icon: Icons.arrow_back_rounded,
-                                  onPressed: () => _selectExercise(_cur - 1),
-                                  outline: true,
-                                  sm: true,
-                                  full: true,
-                                ),
-                              ),
-                            if (_cur > 0 && _cur < _exercises.length - 1)
-                              const SizedBox(width: 8),
-                            if (_cur < _exercises.length - 1)
-                              Expanded(
-                                child: ApexButton(
-                                  text: 'Next',
-                                  icon: Icons.arrow_forward_rounded,
-                                  onPressed: () => _selectExercise(_cur + 1),
-                                  sm: true,
-                                  full: true,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ],
+                        }
+                        return _buildExerciseBlock(ei, _exercises[ei]);
+                      },
                     ),
             ),
 
@@ -929,5 +648,230 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       ),
     ], // Stack children
     ); // Stack
+  }
+
+  Widget _buildExerciseBlock(int ei, Map<String, dynamic> ex) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: ApexColors.card,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                ex['name'] ?? '',
+                style: GoogleFonts.inter(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: ApexColors.t1,
+                ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  setState(() {
+                    _exercises.removeAt(ei);
+                    _logs.remove(ei);
+                    // Re-index remaining logs
+                    final newLogs = <int, List<Map<String, dynamic>>>{};
+                    for (var i = 0; i < _exercises.length; i++) {
+                      newLogs[i] = _logs[i >= ei ? i + 1 : i] ?? [];
+                    }
+                    _logs.clear();
+                    _logs.addAll(newLogs);
+                  });
+                },
+                child: const Icon(Icons.close_rounded,
+                    color: ApexColors.t3, size: 20),
+              ),
+            ],
+          ),
+          Text(
+            'Edit each set independently',
+            style: TextStyle(color: ApexColors.t2, fontSize: 10),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              SizedBox(
+                width: 34,
+                child: Text(
+                  '#',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: ApexColors.t3,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  'REPS',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: ApexColors.t3,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  'KG',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: ApexColors.t3,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(
+                width: 40,
+                child: Text(
+                  '✓',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: ApexColors.t3,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          ...(_logs[ei] ?? []).asMap().entries.map((entry) {
+            final si = entry.key;
+            final s = entry.value;
+            final prevSet = _previousSetFor(ex['name'], si + 1);
+            final pReps = prevSet?['reps_done']?.toString() ?? '';
+            final pWeight = prevSet?['weight_kg']?.toString() ?? '';
+            return WorkoutSetRow(
+              key: ValueKey('$ei-$si'),
+              setNumber: si + 1,
+              setData: s,
+              previousReps: pReps,
+              previousWeight: pWeight,
+              deltaPercent: _deltaPercentForSet(
+                ex['name'],
+                si + 1,
+                s,
+              ),
+              onToggleType: () => _toggleType(ei, si),
+              onRepsChanged: (v) => _upd(ei, si, 'reps', v),
+              onWeightChanged: (v) => _upd(ei, si, 'weight', v),
+              onFieldTap: () => setState(() {
+                _focusedEx = ei;
+                _focusedSet = si;
+              }),
+              onWeightLongPress: () {
+                HapticFeedback.mediumImpact();
+                final currentWeight =
+                    double.tryParse(s['weight']?.toString() ?? '0') ?? 0;
+                showPlateCalculator(
+                  context,
+                  initialWeight: currentWeight > 0 ? currentWeight : 60,
+                );
+              },
+              onToggleDone: () => _toggle(ei, si),
+            );
+          }),
+          GestureDetector(
+            onTap: () => _addSet(ei),
+            child: Container(
+              margin: const EdgeInsets.only(top: 9),
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: ApexColors.border,
+                  style: BorderStyle.solid,
+                ),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Center(
+                child: Text(
+                  'Add set',
+                  style: TextStyle(
+                    color: ApexColors.t2,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (_focusedEx == ei) ...[
+            const SizedBox(height: 24),
+            Text(
+              'QUICK ADD (Set ${_focusedSet != null ? _focusedSet! + 1 : '-'})',
+              style: TextStyle(
+                color: ApexColors.t3,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [2.5, 5.0, 10.0, 15.0, 20.0, 25.0].map((v) => Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: GestureDetector(
+                        onTap: () {
+                          if (_focusedSet != null) {
+                            final setMap = _logs[ei]![_focusedSet!];
+                            final currentW = double.tryParse(
+                                  setMap['weight']?.toString() ?? '0',
+                                ) ??
+                                0;
+                            String newW = (currentW + v).toString();
+                            if (newW.endsWith('.0')) {
+                              newW = newW.substring(0, newW.length - 2);
+                            }
+                            _upd(ei, _focusedSet!, 'weight', newW);
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: ApexColors.surface,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: ApexColors.border),
+                          ),
+                          child: Text(
+                            '+$v',
+                            style: TextStyle(
+                              color: ApexColors.t1,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )).toList(),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }

@@ -7,7 +7,9 @@ import '../services/supabase_service.dart';
 import 'exercise_detail_screen.dart';
 
 class ExerciseLibraryScreen extends StatefulWidget {
-  const ExerciseLibraryScreen({super.key});
+  final Function(Map<String, dynamic>)? onSelect;
+
+  const ExerciseLibraryScreen({super.key, this.onSelect});
 
   @override
   State<ExerciseLibraryScreen> createState() => _ExerciseLibraryScreenState();
@@ -326,13 +328,17 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                       return GestureDetector(
                         onTap: () {
                           Haptics.vibrate(HapticsType.light);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  ExerciseDetailScreen(exercise: ex),
-                            ),
-                          );
+                          if (widget.onSelect != null) {
+                            widget.onSelect!(ex);
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    ExerciseDetailScreen(exercise: ex),
+                              ),
+                            );
+                          }
                         },
                         child: Container(
                           margin: const EdgeInsets.only(

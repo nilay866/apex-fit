@@ -222,7 +222,6 @@ class _MainShellState extends State<MainShell> {
         ),
       ),
       bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         child: _buildNavBar(),
       ),
     );
@@ -264,18 +263,12 @@ class _MainShellState extends State<MainShell> {
   // ── Bottom nav bar ───────────────────────────────────────────────────────
   Widget _buildNavBar() {
     return Container(
-      height: 72,
-      decoration: BoxDecoration(
-        color: ApexColors.surface.withAlpha(235),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: ApexColors.borderStrong),
-        boxShadow: [
-          BoxShadow(
-            color: ApexColors.shadow.withAlpha(54),
-            blurRadius: 26,
-            offset: const Offset(0, 14),
-          ),
-        ],
+      height: 64,
+      decoration: const BoxDecoration(
+        color: ApexColors.surface,
+        border: Border(
+          top: BorderSide(color: Color(0x14000000), width: 0.5),
+        ),
       ),
       child: Row(
         children: List.generate(_navItems.length, (index) {
@@ -293,42 +286,21 @@ class _MainShellState extends State<MainShell> {
                 }
               },
               behavior: HitTestBehavior.opaque,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOutCubic,
-                margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                decoration: BoxDecoration(
-                  color: active ? ApexColors.accentDim : Colors.transparent,
-                  borderRadius: BorderRadius.circular(22),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(item['icon'] as IconData, size: 20, color: color),
-                    const SizedBox(height: 5),
-                    Text(
-                      item['label'] as String,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: color,
-                        letterSpacing: 0.7,
-                        fontWeight: active
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                      ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(item['icon'] as IconData, size: 22, color: color),
+                  const SizedBox(height: 4),
+                  Text(
+                    item['label'] as String,
+                    style: GoogleFonts.inter(
+                      color: color,
+                      fontSize: 10,
+                      fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                      letterSpacing: 0.2,
                     ),
-                    const SizedBox(height: 5),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: active ? 18 : 6,
-                      height: 3,
-                      decoration: BoxDecoration(
-                        color: active ? ApexColors.accent : Colors.transparent,
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           );

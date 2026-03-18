@@ -16,84 +16,105 @@ class QuickActionFab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(
-        color: ApexColors.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: ApexColors.borderStrong),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(60),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          _fabItem(
-            icon: Icons.fitness_center_rounded,
-            label: 'Workout',
-            color: ApexColors.accent,
+          // ── Primary CTA: Full-width black pill ──────────────────
+          GestureDetector(
             onTap: onStartWorkout,
-            flex: 2,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: ApexColors.darkAction,
+                borderRadius: BorderRadius.circular(50),
+                boxShadow: [
+                  BoxShadow(
+                    color: ApexColors.darkAction.withAlpha(40),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.play_arrow_rounded,
+                    color: ApexColors.ink,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Quick Start Workout',
+                    style: GoogleFonts.inter(
+                      color: ApexColors.ink,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(width: 6),
-          _fabItem(
-            icon: Icons.restaurant_rounded,
-            label: 'Meal',
-            color: ApexColors.orange,
-            onTap: onLogMeal,
-            flex: 1,
-          ),
-          const SizedBox(width: 6),
-          _fabItem(
-            icon: Icons.water_drop_rounded,
-            label: 'Water',
-            color: ApexColors.blue,
-            onTap: onAddWater,
-            flex: 1,
+          const SizedBox(height: 10),
+          // ── Secondary actions row ──────────────────────────────
+          Row(
+            children: [
+              Expanded(
+                child: _secondaryAction(
+                  icon: Icons.restaurant_rounded,
+                  label: 'Log Meal',
+                  color: ApexColors.accent,
+                  onTap: onLogMeal,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _secondaryAction(
+                  icon: Icons.water_drop_rounded,
+                  label: 'Water',
+                  color: ApexColors.blue,
+                  onTap: onAddWater,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _fabItem({
+  Widget _secondaryAction({
     required IconData icon,
     required String label,
     required Color color,
     required VoidCallback onTap,
-    required int flex,
   }) {
-    return Expanded(
-      flex: flex,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: color.withAlpha(20),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: color.withAlpha(60)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: color, size: 18),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: GoogleFonts.inter(
-                  color: color,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withAlpha(15),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                color: color,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

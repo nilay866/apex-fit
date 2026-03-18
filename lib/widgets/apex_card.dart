@@ -16,13 +16,12 @@ class ApexCard extends StatelessWidget {
     this.glowColor,
     this.padding,
     this.onTap,
-    this.floating = true, // We keep the param so we don't break existing usages, but it does nothing now
+    this.floating = true,
   });
 
   @override
   Widget build(BuildContext context) {
-    final glowC = glowColor ?? ApexColors.accentSoft;
-    final radius = BorderRadius.circular(28);
+    final radius = BorderRadius.circular(20);
 
     return Material(
       color: Colors.transparent,
@@ -31,19 +30,21 @@ class ApexCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: radius,
         child: Container(
-          padding: padding ?? const EdgeInsets.all(18),
+          padding: padding ?? const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: radius,
             color: ApexColors.card,
-            border: Border.all(
-              color: glow ? glowC.withAlpha(84) : ApexColors.border,
-            ),
-            boxShadow: [
-              // Keep shadows extremely minimal for a clean modern flat look
+            border: glow
+                ? Border.all(
+                    color: (glowColor ?? ApexColors.accent).withAlpha(40),
+                  )
+                : null,
+            boxShadow: const [
               BoxShadow(
-                color: ApexColors.shadow.withAlpha(16),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: Color(0x0A000000),
+                blurRadius: 24,
+                spreadRadius: 0,
+                offset: Offset(0, 8),
               ),
             ],
           ),

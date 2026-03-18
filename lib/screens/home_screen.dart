@@ -9,7 +9,7 @@ import '../constants/theme.dart';
 import '../widgets/apex_card.dart';
 import '../widgets/apex_button.dart';
 import '../widgets/apex_tag.dart';
-import '../widgets/apex_screen_header.dart';
+
 import '../widgets/apex_trend_chart.dart';
 import '../widgets/streak_calendar.dart';
 import '../repositories/workout_repository.dart';
@@ -20,7 +20,6 @@ import '../services/cache_service.dart';
 import '../services/achievement_service.dart';
 import '../widgets/achievement_badges.dart';
 import '../services/nfi_service.dart';
-import '../widgets/nfi_ring_widget.dart';
 import '../widgets/mood_checkin_widget.dart';
 import '../widgets/quick_action_fab.dart';
 import 'workout_programs_screen.dart';
@@ -445,28 +444,222 @@ class _HomeScreenState extends State<HomeScreen> {
       onRefresh: _load,
       color: ApexColors.accent,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
         children: [
-          ApexScreenHeader(
-            eyebrow: 'Dashboard',
-            title: firstName,
-            subtitle:
-                'Good $greet. Your overview moves with your training week.',
-            trailing: _streak > 0 ? _streakBadge() : null,
+          // ── Clean Greeting Header ─────────────────────────────
+          Text(
+            'Good $greet,',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: ApexColors.t3,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            firstName,
+            style: GoogleFonts.inter(
+              fontSize: 28,
+              color: ApexColors.t1,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 10),
+          // ── Streak Badge ──────────────────────────────────────
+          if (_streak > 0)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: ApexColors.accent.withAlpha(12),
+                  borderRadius: BorderRadius.circular(50),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.local_fire_department_rounded,
+                        color: ApexColors.accent, size: 14),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$_streak Day Streak',
+                      style: GoogleFonts.inter(
+                        color: ApexColors.accent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 16),
+
+          // ── Activity Rings Card ───────────────────────────────
+          ApexCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Activity Rings',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: ApexColors.t3,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    // Rings visualization
+                    SizedBox(
+                      width: 100,
+                      height: 100,
+                      child: CustomPaint(
+                        painter: _ActivityRingPainter(
+                          score: _nfiResult?.score ?? 0,
+                        ),
+                        child: Center(
+                          child: _nfiLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: ApexColors.accent,
+                                  ),
+                                )
+                              : Text(
+                                  '${_nfiResult?.score ?? 0}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: ApexColors.t1,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    // Ring legends
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _ringLegend('Move', _calorieNotifier.value, calGoal,
+                              'kcal', ApexColors.accent),
+                          const SizedBox(height: 10),
+                          _ringLegend('Exercise', _stepsNotifier.value ~/ 100,
+                              45, 'min', ApexColors.green),
+                          const SizedBox(height: 10),
+                          _ringLegend('Stand', 10, 12, 'hr', ApexColors.blue),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
-          // NEW: NFI Recovery Ring
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: NfiRingWidget(result: _nfiResult, isLoading: _nfiLoading),
+
+          // ── Stats Mini Cards Row ──────────────────────────────
+          Row(
+            children: [
+              Expanded(
+                child: ApexCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.flash_on_rounded,
+                              color: ApexColors.accent, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Workouts',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: ApexColors.t3,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${_logs.length}',
+                        style: GoogleFonts.inter(
+                          fontSize: 28,
+                          color: ApexColors.t1,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'this week',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: ApexColors.t3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ApexCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.bedtime_rounded,
+                              color: ApexColors.blue, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Sleep',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: ApexColors.t3,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '7h 12m',
+                        style: GoogleFonts.inter(
+                          fontSize: 28,
+                          color: ApexColors.t1,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'last night',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: ApexColors.t3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-          
-          // NEW: Quick Action FAB inline
+          const SizedBox(height: 16),
+
+          // ── Quick Start Workout CTA ───────────────────────────
           QuickActionFab(
             onStartWorkout: () => widget.onStartWorkout({}),
             onLogMeal: _openLogMealSheet,
             onAddWater: () => setState(() => _addWater = !_addWater),
           ),
+          const SizedBox(height: 12),
           
           // NEW: Mood check-in
           Padding(
@@ -813,53 +1006,46 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _streakBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: ApexColors.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: ApexColors.orange.withAlpha(110)),
-        boxShadow: [
-          BoxShadow(
-            color: ApexColors.orange.withAlpha(20),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+  Widget _ringLegend(
+      String label, int value, int goal, String unit, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            color: ApexColors.t2,
+            fontWeight: FontWeight.w500,
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.local_fire_department_rounded,
-                size: 16,
-                color: ApexColors.orange,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '$_streak',
-                style: ApexTheme.mono(size: 16, color: ApexColors.t1),
-              ),
-            ],
+        ),
+        const Spacer(),
+        Text(
+          '$value',
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: ApexColors.t1,
+            fontWeight: FontWeight.w700,
           ),
-          const SizedBox(height: 4),
-          Text(
-            'DAY STREAK',
-            style: GoogleFonts.inter(
-              fontSize: 8,
-              color: ApexColors.t2,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
-            ),
+        ),
+        Text(
+          '/$goal $unit',
+          style: GoogleFonts.inter(
+            fontSize: 11,
+            color: ApexColors.t3,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
+
+
+
 
   Widget _statCard(
     String label,
@@ -1949,4 +2135,50 @@ class _LogMealSheetState extends State<_LogMealSheet> {
       ),
     );
   }
+}
+
+class _ActivityRingPainter extends CustomPainter {
+  final int score;
+  const _ActivityRingPainter({required this.score});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // A simplified activity ring painter to replace NfiRingPainter
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final radius = size.width / 2 - 8;
+    const stroke = 12.0;
+
+    final Color ringColor;
+    if (score >= 80) {
+      ringColor = ApexColors.green;
+    } else if (score >= 50) {
+      ringColor = const Color(0xFFFFAA00);
+    } else {
+      ringColor = ApexColors.accent;
+    }
+
+    final trackPaint = Paint()
+      ..color = ringColor.withAlpha(30)
+      ..strokeWidth = stroke
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawCircle(Offset(cx, cy), radius, trackPaint);
+
+    final fillPaint = Paint()
+      ..color = ringColor
+      ..strokeWidth = stroke
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(
+      Rect.fromCircle(center: Offset(cx, cy), radius: radius),
+      -3.14159 / 2,
+      2 * 3.14159 * (score / 100).clamp(0.0, 1.0),
+      false,
+      fillPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_ActivityRingPainter old) => old.score != score;
 }
