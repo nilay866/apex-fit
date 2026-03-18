@@ -104,6 +104,7 @@ class _WorkoutSetRowState extends State<WorkoutSetRow> {
       ),
       child: Row(
         children: [
+          // 1. SET NUMBER / TYPE
           SizedBox(
             width: 34,
             child: GestureDetector(
@@ -131,6 +132,43 @@ class _WorkoutSetRowState extends State<WorkoutSetRow> {
               ),
             ),
           ),
+          const SizedBox(width: 4),
+          // 2. WEIGHT (KG/LBS)
+          Expanded(
+            child: GestureDetector(
+              onLongPress: widget.onWeightLongPress,
+              child: TextField(
+                controller: _weightController,
+                onChanged: widget.onWeightChanged,
+                onTap: widget.onFieldTap,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                style: ApexTheme.mono(size: 16),
+                decoration: InputDecoration(
+                  hintText: widget.previousWeight.isNotEmpty
+                      ? widget.previousWeight
+                      : '0',
+                  hintStyle: ApexTheme.mono(
+                    size: 14,
+                    color: ApexColors.t3.withValues(alpha: 0.5),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                  filled: true,
+                  fillColor: ApexColors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(7),
+                    borderSide: BorderSide(color: ApexColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(7),
+                    borderSide: BorderSide(color: ApexColors.border),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          // 3. REPS
           Expanded(
             child: TextField(
               controller: _repsController,
@@ -154,60 +192,30 @@ class _WorkoutSetRowState extends State<WorkoutSetRow> {
                   borderRadius: BorderRadius.circular(7),
                   borderSide: BorderSide(color: ApexColors.border),
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: GestureDetector(
-              onLongPress: widget.onWeightLongPress,
-              child: AbsorbPointer(
-                absorbing: false,
-                child: TextField(
-                  controller: _weightController,
-                  onChanged: widget.onWeightChanged,
-                  onTap: widget.onFieldTap,
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  style: ApexTheme.mono(size: 16),
-                  decoration: InputDecoration(
-                    hintText: widget.previousWeight.isNotEmpty
-                        ? widget.previousWeight
-                        : '0',
-                    hintStyle: ApexTheme.mono(
-                      size: 14,
-                      color: ApexColors.t3.withValues(alpha: 0.5),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                    filled: true,
-                    fillColor: ApexColors.surface,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(7),
-                      borderSide: BorderSide(color: ApexColors.border),
-                    ),
-                  ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(7),
+                  borderSide: BorderSide(color: ApexColors.border),
                 ),
               ),
             ),
           ),
           const SizedBox(width: 6),
+          // 4. DONE STATUS & DELTA
           if (done && widget.deltaPercent != null)
             Container(
               margin: const EdgeInsets.only(right: 6),
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               decoration: BoxDecoration(
-                color:
-                    (widget.deltaPercent! > 0
-                            ? ApexColors.accent
-                            : ApexColors.red)
-                        .withAlpha(25),
+                color: (widget.deltaPercent! > 0
+                        ? ApexColors.accent
+                        : ApexColors.red)
+                    .withAlpha(25),
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color:
-                      (widget.deltaPercent! > 0
-                              ? ApexColors.accent
-                              : ApexColors.red)
-                          .withAlpha(60),
+                  color: (widget.deltaPercent! > 0
+                          ? ApexColors.accent
+                          : ApexColors.red)
+                      .withAlpha(60),
                 ),
               ),
               child: Text(

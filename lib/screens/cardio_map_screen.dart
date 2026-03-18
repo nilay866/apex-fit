@@ -273,22 +273,6 @@ class _CardioMapScreenState extends State<CardioMapScreen> {
     return 9.0 * _userWeightKg * hours;
   }
 
-  // Split pace string for a split
-  String _splitPace(int splitSecs, int km) {
-    if (km == 0) return '--:--';
-    final prev = km > 1
-        ? (_splits.firstWhere(
-                (s) => s['km'] == km - 1,
-                orElse: () => {'seconds': 0},
-              )['seconds']
-              as int)
-        : 0;
-    final delta = splitSecs - prev;
-    final m = (delta ~/ 60).toString().padLeft(2, '0');
-    final s = (delta % 60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
-
   @override
   void dispose() {
     _timer?.cancel();
@@ -318,7 +302,7 @@ class _CardioMapScreenState extends State<CardioMapScreen> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+                urlTemplate: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
                 subdomains: const ['a', 'b', 'c', 'd'],
               ),
               if (_routeCoords.isNotEmpty)
@@ -374,27 +358,30 @@ class _CardioMapScreenState extends State<CardioMapScreen> {
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xDD1C1C1F),
+                      color: ApexColors.green,
                       borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: ApexColors.green.withValues(alpha: 0.3),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.my_location_rounded,
-                          color: _followUser
-                              ? ApexColors.accent
-                              : Colors.white70,
-                          size: 16,
+                        const Icon(
+                          Icons.radar_rounded,
+                          color: Colors.white,
+                          size: 14,
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          'Center',
-                          style: TextStyle(
-                            color: _followUser
-                                ? ApexColors.accent
-                                : Colors.white70,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                          'GPS Ready',
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
                       ],
@@ -411,206 +398,156 @@ class _CardioMapScreenState extends State<CardioMapScreen> {
             left: 0,
             right: 0,
             child: Container(
-              padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPad + 20),
-              decoration: const BoxDecoration(
-                color: Color(0xF51C1C1F),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              padding: EdgeInsets.fromLTRB(24, 32, 24, bottomPad + 12),
+              decoration: BoxDecoration(
+                color: ApexColors.surface,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                boxShadow: [
+                  BoxShadow(
+                    color: ApexColors.shadow.withValues(alpha: 0.15),
+                    blurRadius: 30,
+                    offset: const Offset(0, -10),
+                  ),
+                ],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Big timer
-                  Text(
-                    _formattedTime,
-                    style: GoogleFonts.inter(
-                      fontSize: 52,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      letterSpacing: -2,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Main stats row
+                  // Main metrics row (Distance, Pace, Time)
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       _Stat(
-                        label: 'KM',
-                        value: (_totalDistanceMeters / 1000).toStringAsFixed(2),
-                        color: ApexColors.accent,
+                        label: 'DISTANCE',
+                        value: (_totalDistanceMeters / 1609.34).toStringAsFixed(2),
+                        suffix: ' mi',
+                        color: ApexColors.t1,
                       ),
-                      _divider(),
                       _Stat(
-                        label: 'PACE /KM',
+                        label: 'AVERAGE',
                         value: _formattedPace,
-                        color: ApexColors.blue,
+                        suffix: ' /mi',
+                        color: ApexColors.t1,
                       ),
-                      _divider(),
                       _Stat(
-                        label: 'KCAL',
-                        value: _kcal.round().toString(),
-                        color: ApexColors.orange,
-                      ),
-                      _divider(),
-                      _Stat(
-                        label: 'KM/H',
-                        value: _liveSpeed,
-                        color: Colors.white70,
+                        label: 'DURATION',
+                        value: _formattedTime,
+                        color: ApexColors.t1,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-
-                  // Splits
-                  if (_splits.isNotEmpty) ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withAlpha(6),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withAlpha(15)),
+                  const SizedBox(height: 24),
+                  
+                  // Secondary highlights (Calories, splits preview etc)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _CompactStat(
+                        icon: Icons.local_fire_department_rounded,
+                        value: '${_kcal.round()} kcal',
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.flag_rounded,
-                            color: ApexColors.accent,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'SPLITS',
-                            style: TextStyle(
-                              color: ApexColors.t3,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: _splits.map((s) {
-                                  final km = s['km'] as int;
-                                  final secs = s['seconds'] as int;
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 16),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'km $km',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                        ),
-                                        Text(
-                                          _splitPace(secs, km),
-                                          style: TextStyle(
-                                            color: ApexColors.t3,
-                                            fontSize: 10,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
+                      _CompactStat(
+                        icon: Icons.trending_up_rounded,
+                        value: '$_liveSpeed km/h',
+                      ),
+                      if (_splits.isNotEmpty)
+                        _CompactStat(
+                          icon: Icons.flag_rounded,
+                          value: '${_splits.length} splits',
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
+          ),
+
+          // ─── Floating Controls Overlapping the Lip ───────────────────────
+          Positioned(
+            bottom: bottomPad + 115, // Positioned above the metrics
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_elapsedSeconds > 0) ...[
+                  GestureDetector(
+                    child: Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: ApexColors.yellow,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: ApexColors.yellow.withValues(alpha: 0.4),
+                            blurRadius: 15,
+                            offset: const Offset(0, 6),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                  ],
-
-                  // Control buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: _toggleTracking,
-                          child: Container(
-                            height: 58,
-                            decoration: BoxDecoration(
-                              color: _isActive
-                                  ? const Color(0xFF2A2A2D)
-                                  : ApexColors.accent,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Center(
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    _isActive
-                                        ? Icons.pause_rounded
-                                        : Icons.play_arrow_rounded,
-                                    color: _isActive
-                                        ? ApexColors.t1
-                                        : Colors.black,
-                                    size: 22,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    _isActive
-                                        ? 'PAUSE'
-                                        : (_elapsedSeconds > 0
-                                              ? 'RESUME'
-                                              : 'START'),
-                                    style: TextStyle(
-                                      color: _isActive
-                                          ? ApexColors.t1
-                                          : Colors.black,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                      child: IconButton(
+                        onPressed: _toggleTracking,
+                        icon: Icon(
+                          _isActive ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 32,
                         ),
                       ),
-                      if (_elapsedSeconds > 0) ...[
-                        const SizedBox(width: 12),
-                        GestureDetector(
-                          onTap: _finishWorkout,
-                          child: Container(
-                            height: 58,
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            decoration: BoxDecoration(
-                              color: ApexColors.red.withAlpha(30),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: ApexColors.red.withAlpha(80),
-                              ),
-                            ),
-                            child: Center(
-                              child: Text(
-                                'FINISH',
-                                style: TextStyle(
-                                  color: ApexColors.red,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 1,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+                    ),
                   ),
-                ],
-              ),
+                  const SizedBox(width: 24),
+                  GestureDetector(
+                    child: Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: ApexColors.red,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: ApexColors.red.withValues(alpha: 0.4),
+                            blurRadius: 15,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: IconButton(
+                        onPressed: _finishWorkout,
+                        icon: const Icon(
+                          Icons.stop_rounded,
+                          color: Colors.white,
+                          size: 32,
+                        ),
+                      ),
+                    ),
+                  ),
+                ] else
+                  GestureDetector(
+                    onTap: _toggleTracking,
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: ApexColors.green,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: ApexColors.green.withValues(alpha: 0.4),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 40,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],
@@ -656,40 +593,93 @@ class _CardioMapScreenState extends State<CardioMapScreen> {
       ),
     );
   }
-
-  Widget _divider() => Container(width: 1, height: 36, color: Colors.white12);
 }
 
 class _Stat extends StatelessWidget {
   final String label;
   final String value;
+  final String? suffix;
   final Color color;
-  const _Stat({required this.label, required this.value, required this.color});
+  const _Stat({
+    required this.label,
+    required this.value,
+    this.suffix,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          value,
-          style: GoogleFonts.inter(
-            fontSize: 24,
-            fontWeight: FontWeight.w800,
-            color: color,
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(
+              value,
+              style: GoogleFonts.inter(
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+                color: color,
+                letterSpacing: -1,
+              ),
+            ),
+            if (suffix != null)
+              Text(
+                suffix!,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: ApexColors.t3,
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 2),
         Text(
           label,
-          style: const TextStyle(
+          style: GoogleFonts.inter(
             color: ApexColors.t3,
             fontSize: 9,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.1,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.2,
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CompactStat extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  const _CompactStat({required this.icon, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: ApexColors.cardAlt,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: ApexColors.t2),
+          const SizedBox(width: 6),
+          Text(
+            value,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: ApexColors.t1,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

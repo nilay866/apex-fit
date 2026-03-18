@@ -87,7 +87,7 @@ class ApexTrendChart extends StatelessWidget {
               barRods: [
                 BarChartRodData(
                   toY: value,
-                  width: compact ? 10 : 16,
+                  width: compact ? 12 : 18,
                   borderRadius: BorderRadius.circular(999),
                   gradient: LinearGradient(
                     begin: Alignment.bottomCenter,
@@ -162,8 +162,9 @@ class ApexLineTrendChart extends StatelessWidget {
           lineBarsData: [
             LineChartBarData(
               isCurved: true,
+              curveSmoothness: 0.35,
               color: color,
-              barWidth: 3,
+              barWidth: 4.5,
               spots: List.generate(
                 values.length,
                 (index) => FlSpot(index.toDouble(), values[index]),
@@ -173,7 +174,7 @@ class ApexLineTrendChart extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [color.withAlpha(42), Colors.transparent],
+                  colors: [color.withAlpha(80), Colors.transparent],
                 ),
               ),
               dotData: FlDotData(

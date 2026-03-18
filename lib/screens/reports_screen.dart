@@ -12,6 +12,8 @@ import '../widgets/heatmaps_painter.dart';
 import '../services/supabase_service.dart';
 import '../services/plan_generator_service.dart';
 import '../services/progress_forecast_service.dart';
+import '../services/achievement_service.dart';
+import '../widgets/achievement_badges.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -31,6 +33,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   bool _savingBw = false;
   String? _waterError;
   bool _show1RM = false;
+  List<Achievement> _unlockedAchievements = [];
 
   // NEW: Forecast state
   String? _predictionLabel;
@@ -74,6 +77,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
         _waterError = waterError;
         _loading = false;
       });
+
+      // Calculate achievements
+      final achievements = await AchievementService.checkAchievements(_wLogs, 0); // Streak is 0 for stats window
+      if (mounted) {
+        setState(() {
+          _unlockedAchievements = achievements;
+        });
+      }
 
       // NEW: Compute forecast after data loads
       _computeForecast();
@@ -213,6 +224,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 'Achievements, graphs, and daily signals that feel more like a game board.',
           ),
           const SizedBox(height: 14),
+          if (_unlockedAchievements.isNotEmpty) ...[
+            AchievementList(unlockedAchievements: _unlockedAchievements),
+            const SizedBox(height: 24),
+          ],
           Row(
             children: [
               Expanded(

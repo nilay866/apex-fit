@@ -6,12 +6,22 @@ class QuickActionFab extends StatelessWidget {
   final VoidCallback onStartWorkout;
   final VoidCallback onLogMeal;
   final VoidCallback onAddWater;
+  final VoidCallback onLogWeight;
+  final int currentCalories;
+  final int targetCalories;
+  final int currentWaterMl;
+  final int targetWaterMl;
 
   const QuickActionFab({
     super.key,
     required this.onStartWorkout,
     required this.onLogMeal,
     required this.onAddWater,
+    required this.onLogWeight,
+    this.currentCalories = 0,
+    this.targetCalories = 2000,
+    this.currentWaterMl = 0,
+    this.targetWaterMl = 2500,
   });
 
   @override
@@ -67,6 +77,7 @@ class QuickActionFab extends StatelessWidget {
                 child: _secondaryAction(
                   icon: Icons.restaurant_rounded,
                   label: 'Log Meal',
+                  subtitle: '$currentCalories / $targetCalories',
                   color: ApexColors.accent,
                   onTap: onLogMeal,
                 ),
@@ -76,8 +87,19 @@ class QuickActionFab extends StatelessWidget {
                 child: _secondaryAction(
                   icon: Icons.water_drop_rounded,
                   label: 'Water',
+                  subtitle: '${(currentWaterMl / 1000).toStringAsFixed(1)} / ${(targetWaterMl / 1000).toStringAsFixed(1)}L',
                   color: ApexColors.blue,
                   onTap: onAddWater,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _secondaryAction(
+                  icon: Icons.monitor_weight_rounded,
+                  label: 'Weight',
+                  subtitle: 'Track BW',
+                  color: ApexColors.purple,
+                  onTap: onLogWeight,
                 ),
               ),
             ],
@@ -90,29 +112,40 @@ class QuickActionFab extends StatelessWidget {
   Widget _secondaryAction({
     required IconData icon,
     required String label,
+    required String subtitle,
     required Color color,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
         decoration: BoxDecoration(
           color: color.withAlpha(15),
           borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withAlpha(30)),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Column(
           children: [
-            Icon(icon, color: color, size: 16),
-            const SizedBox(width: 6),
+            Icon(icon, color: color, size: 18),
+            const SizedBox(height: 4),
             Text(
               label,
               style: GoogleFonts.inter(
                 color: color,
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                fontSize: 11,
               ),
+              textAlign: TextAlign.center,
+            ),
+            Text(
+              subtitle,
+              style: GoogleFonts.inter(
+                color: color.withAlpha(180),
+                fontWeight: FontWeight.w500,
+                fontSize: 9,
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),

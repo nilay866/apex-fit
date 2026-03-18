@@ -9,6 +9,7 @@ class ActiveWorkoutHeader extends StatelessWidget {
   final int totalCount;
   final num totalVolume;
   final String elapsedLabel;
+  final VoidCallback? onClose;
 
   const ActiveWorkoutHeader({
     super.key,
@@ -17,6 +18,7 @@ class ActiveWorkoutHeader extends StatelessWidget {
     required this.totalCount,
     required this.totalVolume,
     required this.elapsedLabel,
+    this.onClose,
   });
 
   @override
@@ -32,24 +34,33 @@ class ActiveWorkoutHeader extends StatelessWidget {
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    workoutName,
-                    style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                      color: ApexColors.t1,
+              if (onClose != null)
+                IconButton(
+                  onPressed: onClose,
+                  icon: const Icon(Icons.close_rounded, color: ApexColors.t3),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              if (onClose != null) const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      workoutName,
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        color: ApexColors.t1,
+                      ),
                     ),
-                  ),
-                  Text(
-                    '$doneCount/$totalCount sets · ${totalVolume}kg',
-                    style: const TextStyle(color: ApexColors.t2, fontSize: 10),
-                  ),
-                ],
+                    Text(
+                      '$doneCount/$totalCount sets · ${totalVolume}kg',
+                      style: const TextStyle(color: ApexColors.t2, fontSize: 10),
+                    ),
+                  ],
+                ),
               ),
               Text(
                 elapsedLabel,

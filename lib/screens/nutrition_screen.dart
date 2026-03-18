@@ -470,6 +470,23 @@ class _NutritionScreenState extends State<NutritionScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent, // Shell sets BG
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 24),
+        child: FloatingActionButton.extended(
+          onPressed: _showAddModal,
+          elevation: 12,
+          backgroundColor: ApexColors.red,
+          icon: const Icon(Icons.add_rounded, color: Colors.white),
+          label: Text(
+            'Add Food',
+            style: GoogleFonts.inter(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: RefreshIndicator(
         onRefresh: _load,
         color: ApexColors.accent,
@@ -573,21 +590,21 @@ class _NutritionScreenState extends State<NutritionScreen> {
                   ),
                   const SizedBox(height: 16),
                   MacroBar(
-                    label: 'Protein',
+                    label: 'PROTEIN',
                     value: totProt,
                     goal: 160,
                     color: ApexColors.blue,
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 16),
                   MacroBar(
-                    label: 'Carbs',
+                    label: 'CARBS',
                     value: totCarbs,
                     goal: 250,
                     color: ApexColors.orange,
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 16),
                   MacroBar(
-                    label: 'Fat',
+                    label: 'FAT',
                     value: totFat,
                     goal: 70,
                     color: ApexColors.purple,
@@ -643,13 +660,14 @@ class _NutritionScreenState extends State<NutritionScreen> {
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: ApexColors.orange.withAlpha(20),
+                            color: ApexColors.surface,
                             borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: ApexColors.border),
                           ),
                           child: const Icon(
-                            Icons.restaurant_rounded,
+                            Icons.fastfood_rounded,
                             size: 20,
-                            color: ApexColors.orange,
+                            color: ApexColors.t2,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -723,21 +741,8 @@ class _NutritionScreenState extends State<NutritionScreen> {
                   ),
                 ),
               ),
+            const SizedBox(height: 60), // Add padding for bottom
           ],
-        ),
-      ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 20, right: 8),
-        child: FloatingActionButton(
-          key: const ValueKey('log_meal_fab'),
-          onPressed: _showAddModal,
-          backgroundColor: ApexColors.t1,
-          foregroundColor: ApexColors.bg,
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Icon(Icons.add_rounded, size: 28),
         ),
       ),
     );

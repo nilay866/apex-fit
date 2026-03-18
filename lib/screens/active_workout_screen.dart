@@ -11,11 +11,13 @@ import '../services/adaptive_logic.dart';
 import '../services/plan_generator_service.dart';
 import '../workout_engine/plate_calculator.dart';
 import '../widgets/pr_celebration_overlay.dart';
+import '../services/supabase_service.dart';
 import 'exercise_library_screen.dart';
 import 'active_workout/widgets/rest_timer_banner.dart';
 import 'active_workout/widgets/session_footer.dart';
 import 'active_workout/widgets/workout_header.dart';
 import 'active_workout/widgets/workout_set_row.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 class ActiveWorkoutScreen extends StatefulWidget {
   final Map<String, dynamic> workout;
@@ -41,6 +43,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
   final _sessionNotesC = TextEditingController();
   int? _focusedEx;
   int? _focusedSet;
+  final ItemScrollController _itemScrollController = ItemScrollController();
+  final ItemPositionsListener _itemPositionsListener = ItemPositionsListener.create();
   int? _rest;
   String _notes = '';
   String _intensity = 'moderate';
@@ -84,12 +88,106 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
 
     _checkRecoveredState();
 
+    // Only start timer if we already have exercises (e.g. from a template)
+    if (_exercises.isNotEmpty) {
+      _startTimer();
+    }
+  }
+
+  void _startTimer() {
+    if (_tRef != null) return;
     _tRef = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
         setState(() => _timer++);
         if (_timer % 10 == 0) _saveState(); // Auto-save every 10s
       }
     });
+  }
+
+  void _showExitConfirmation() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ApexColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'End session early?',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w800, color: ApexColors.t1),
+        ),
+        content: Text(
+          'Do you want to save your current progress or discard this session?',
+          style: GoogleFonts.inter(color: ApexColors.t2),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _saveAndFinish();
+            },
+            child: const Text('Save', style: TextStyle(color: ApexColors.accent)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              StorageService.clearActiveWorkoutState();
+              Navigator.pop(context);
+            },
+            child: const Text('Discard', style: TextStyle(color: ApexColors.red)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: ApexColors.t3)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveAndFinish() async {
+    setState(() => _saving = true);
+    try {
+      double totalVol = 0;
+      for (final exLogs in _logs.values) {
+        for (final s in exLogs) {
+          if (s['done'] == true) {
+            totalVol += (double.tryParse(s['weight'].toString()) ?? 0) *
+                (int.tryParse(s['reps'].toString()) ?? 0);
+          }
+        }
+      }
+
+      final userId = authRepository.currentUser?.id;
+      if (userId == null) throw 'User not authenticated';
+
+      // Capture final state
+      final logData = {
+        'user_id': userId,
+        'workout_name': widget.workout['name'] ?? 'Quick Start',
+        'duration_min': _timer ~/ 60,
+        'total_volume': totalVol,
+        'intensity': _intensity,
+        'completed_at': DateTime.now().toIso8601String(),
+        'notes': _notes,
+      };
+
+      // In a real app, we'd also save the individual sets to a 'workout_sets' table
+      // For this MVP, we save the summary log.
+      await SupabaseService.createWorkoutLog(logData);
+      
+      await StorageService.clearActiveWorkoutState();
+      
+      if (mounted) {
+        widget.onFinish();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save: $e'), backgroundColor: ApexColors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   void _addExerciseFromLibrary() {
@@ -107,6 +205,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 {'reps': '10', 'weight': '', 'done': false, 'type': 'normal'},
               ];
               _cur = _exercises.length - 1;
+              _startTimer(); // Ensure timer starts when first exercise added
             });
             Navigator.pop(context);
           },
@@ -562,21 +661,60 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               totalCount: _totalCount,
               totalVolume: _totalVol,
               elapsedLabel: _fmt(_timer),
+              onClose: _showExitConfirmation,
             ),
 
-            if (_rest != null)
-              RestTimerBanner(
-                formattedTime: _fmt(_rest!),
-                onDecrease: () =>
-                    setState(() => _rest = (_rest! - 5).clamp(1, 9999)),
-                onIncrease: () => setState(() => _rest = _rest! + 15),
-                onSkip: () {
-                  _rRef?.cancel();
-                  setState(() => _rest = null);
-                },
+            // Horizontal Exercise Navigator (Chips)
+            if (_exercises.isNotEmpty)
+              Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: ApexColors.surface,
+                  border: Border(bottom: BorderSide(color: ApexColors.border)),
+                ),
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _exercises.length,
+                  itemBuilder: (ctx, i) {
+                    final sel = _cur == i;
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() => _cur = i);
+                        _itemScrollController.scrollTo(
+                          index: i,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOutCubic,
+                        );
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        margin: const EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: sel ? ApexColors.accent : ApexColors.cardAlt,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: sel ? ApexColors.accent : ApexColors.border,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            _exercises[i]['name'] ?? 'Exercise',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: sel ? ApexColors.bg : ApexColors.t2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
 
-            // Exercise tabs
             // Unified Exercises List
             Expanded(
               child: _exercises.isEmpty
@@ -598,7 +736,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                         ],
                       ),
                     )
-                  : ListView.builder(
+                  : ScrollablePositionedList.builder(
+                      itemScrollController: _itemScrollController,
+                      itemPositionsListener: _itemPositionsListener,
                       padding: const EdgeInsets.only(bottom: 150),
                       itemCount: _exercises.length + 1,
                       itemBuilder: (ctx, ei) {
@@ -616,6 +756,19 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                       },
                     ),
             ),
+
+
+            if (_rest != null)
+              RestTimerBanner(
+                formattedTime: _fmt(_rest!),
+                onDecrease: () =>
+                    setState(() => _rest = (_rest! - 5).clamp(1, 9999)),
+                onIncrease: () => setState(() => _rest = _rest! + 15),
+                onSkip: () {
+                  _rRef?.cancel();
+                  setState(() => _rest = null);
+                },
+              ),
 
             SessionFooter(
               showConfirmation: _showEnd,
@@ -720,7 +873,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               ),
               Expanded(
                 child: Text(
-                  'REPS',
+                  'KG',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 9,
@@ -731,7 +884,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
               ),
               Expanded(
                 child: Text(
-                  'KG',
+                  'REPS',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 9,
