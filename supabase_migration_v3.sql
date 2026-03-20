@@ -94,14 +94,31 @@ alter table public.friends enable row level security;
 alter table public.workout_posts enable row level security;
 
 -- Policies
-create policy if not exists "own_prs" on public.personal_records for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy if not exists "own_1rm" on public.exercise_1rm for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy if not exists "own_routines" on public.routine_templates for all using (auth.uid() = user_id or is_public = true) with check (auth.uid() = user_id);
-create policy if not exists "own_routine_exercises" on public.routine_exercises for all using (auth.uid() = (select user_id from public.routine_templates where id = routine_id)) with check (auth.uid() = (select user_id from public.routine_templates where id = routine_id));
-create policy if not exists "own_streaks" on public.workout_streaks for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy if not exists "own_friends" on public.friends for all using (auth.uid() = user_id or auth.uid() = friend_id) with check (auth.uid() = user_id);
-create policy if not exists "public_posts" on public.workout_posts for select using (true);
-create policy if not exists "own_posts" on public.workout_posts for insert with check (auth.uid() = user_id);
-create policy if not exists "delete_own_posts" on public.workout_posts for delete using (auth.uid() = user_id);
+drop policy if exists "own_prs" on public.personal_records;
+create policy "own_prs" on public.personal_records for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "own_1rm" on public.exercise_1rm;
+create policy "own_1rm" on public.exercise_1rm for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "own_routines" on public.routine_templates;
+create policy "own_routines" on public.routine_templates for all using (auth.uid() = user_id or is_public = true) with check (auth.uid() = user_id);
+
+drop policy if exists "own_routine_exercises" on public.routine_exercises;
+create policy "own_routine_exercises" on public.routine_exercises for all using (auth.uid() = (select user_id from public.routine_templates where id = routine_id)) with check (auth.uid() = (select user_id from public.routine_templates where id = routine_id));
+
+drop policy if exists "own_streaks" on public.workout_streaks;
+create policy "own_streaks" on public.workout_streaks for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists "own_friends" on public.friends;
+create policy "own_friends" on public.friends for all using (auth.uid() = user_id or auth.uid() = friend_id) with check (auth.uid() = user_id);
+
+drop policy if exists "public_posts" on public.workout_posts;
+create policy "public_posts" on public.workout_posts for select using (true);
+
+drop policy if exists "own_posts" on public.workout_posts;
+create policy "own_posts" on public.workout_posts for insert with check (auth.uid() = user_id);
+
+drop policy if exists "delete_own_posts" on public.workout_posts;
+create policy "delete_own_posts" on public.workout_posts for delete using (auth.uid() = user_id);
 
 commit;
