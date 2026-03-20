@@ -36,7 +36,7 @@ void main() {
     await pumpAuthScreen(tester);
 
     await tester.tap(find.text('Create account'));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 500));
 
     await tester.enterText(
       find.byKey(const ValueKey('auth_email_field')),

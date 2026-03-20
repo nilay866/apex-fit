@@ -38,6 +38,14 @@ class _AuthScreenState extends State<AuthScreen> {
     'General Fitness',
   ];
 
+  static const _goalIcons = <String, IconData>{
+    'Build Muscle': Icons.fitness_center_rounded,
+    'Lose Fat': Icons.local_fire_department_rounded,
+    'Calisthenics Skills': Icons.sports_gymnastics_rounded,
+    'Strength & Power': Icons.flash_on_rounded,
+    'General Fitness': Icons.favorite_rounded,
+  };
+
   Future<void> _submit() async {
     if (_emailC.text.trim().isEmpty || _pwC.text.isEmpty) {
       setState(() => _err = 'Enter email and password.');
@@ -97,7 +105,7 @@ class _AuthScreenState extends State<AuthScreen> {
     } catch (e) {
       var message = e.toString();
       if (message.contains('Invalid login')) {
-        message = 'Wrong email or password.';
+        message = 'Wrong email or password. If you\'re new, create an account first.';
       } else if (message.contains('not confirmed')) {
         message = 'Confirm your email first.';
       } else if (message.contains('already registered')) {
@@ -256,7 +264,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             _fieldLabel('Primary goal'),
                             const SizedBox(height: 10),
                             SizedBox(
-                              height: 100,
+                              height: 108,
                               child: ListView(
                                 scrollDirection: Axis.horizontal,
                                 children: _goals.map((goal) {
@@ -268,7 +276,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                         milliseconds: 180,
                                       ),
                                       margin: const EdgeInsets.only(right: 12),
-                                      padding: const EdgeInsets.all(16),
+                                      padding: const EdgeInsets.all(12),
                                       width: 110,
                                       decoration: BoxDecoration(
                                         color: selected
@@ -287,8 +295,8 @@ class _AuthScreenState extends State<AuthScreen> {
                                             MainAxisAlignment.center,
                                         children: [
                                           Icon(
-                                            Icons.flag_circle,
-                                            size: 28,
+                                            _goalIcons[goal] ?? Icons.flag_circle,
+                                            size: 24,
                                             color: selected
                                                 ? ApexColors.accent
                                                 : ApexColors.t3,

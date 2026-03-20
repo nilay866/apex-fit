@@ -6,6 +6,7 @@ import 'package:apex_ai/services/supabase_service.dart';
 import 'package:apex_ai/screens/settings_screen.dart';
 import 'package:apex_ai/screens/achievements_screen.dart';
 import 'package:apex_ai/screens/level_screen.dart';
+import 'package:apex_ai/widgets/edit_goals_sheet.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class ProfileDetailScreen extends StatefulWidget {
@@ -199,6 +200,61 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
 
                   const SizedBox(height: 16),
 
+                  // Daily Goals section
+                  ApexCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Your Daily Goals',
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 16,
+                                color: ApexColors.t1,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                final cal = (_profile?['calorie_goal'] as num?)?.toInt() ?? 2000;
+                                final water = (_profile?['water_goal_ml'] as num?)?.toInt() ?? 2500;
+                                final workout = (_profile?['workout_goal_min'] as num?)?.toInt() ?? 45;
+                                final sleep = (_profile?['sleep_goal_hr'] as num?)?.toDouble() ?? 8.0;
+                                EditGoalsSheet.show(
+                                  context,
+                                  caloriesGoal: cal,
+                                  waterGoalMl: water,
+                                  workoutGoalMin: workout,
+                                  sleepGoalHr: sleep,
+                                  onSaved: _load,
+                                );
+                              },
+                              child: Text(
+                                'Edit',
+                                style: GoogleFonts.inter(
+                                  color: ApexColors.accent,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _goalRow(Icons.local_fire_department_rounded, 'Calories', '${(_profile?['calorie_goal'] ?? 2000)} kcal', ApexColors.accent),
+                        const SizedBox(height: 12),
+                        _goalRow(Icons.water_drop_rounded, 'Water', '${((_profile?['water_goal_ml'] ?? 2500) / 1000).toStringAsFixed(1)} liters', ApexColors.blue),
+                        const SizedBox(height: 12),
+                        _goalRow(Icons.timer_rounded, 'Workout', '${(_profile?['workout_goal_min'] ?? 45)} min', ApexColors.green),
+                        const SizedBox(height: 12),
+                        _goalRow(Icons.bedtime_rounded, 'Sleep', '${(_profile?['sleep_goal_hr'] ?? 8.0)} hours', ApexColors.purple),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
                   // Achievements preview
                   ApexCard(
                     child: Column(
@@ -351,6 +407,32 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
         Text(
           '${500 - xpInLevel} XP to Level ${level + 1}',
           style: const TextStyle(fontSize: 11, color: ApexColors.t3),
+        ),
+      ],
+    );
+  }
+
+  Widget _goalRow(IconData icon, String label, String value, Color color) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: ApexColors.t2,
+          ),
+        ),
+        const Spacer(),
+        Text(
+          value,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: ApexColors.t1,
+          ),
         ),
       ],
     );

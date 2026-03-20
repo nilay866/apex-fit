@@ -138,34 +138,44 @@ class SupabaseService {
   }
 
   static Future<bool> _signInWithGoogle() async {
-    const webClientId = '789994193512-7lehqbflkrhtean4hnogd9c3pht9fdmj.apps.googleusercontent.com';
-    // Use the iOS specific client ID for native iOS login flow
-    const iosClientId = '789994193512-961jfnsk3nr116h58mpjt6s4uvu65fud.apps.googleusercontent.com';
+    try {
+      const webClientId = '789994193512-7lehqbflkrhtean4hnogd9c3pht9fdmj.apps.googleusercontent.com';
+      // Use the iOS specific client ID for native iOS login flow
+      const iosClientId = '789994193512-961jfnsk3nr116h58mpjt6s4uvu65fud.apps.googleusercontent.com';
 
-    await google_auth.GoogleSignIn.instance.initialize(
-      clientId: iosClientId,
-      serverClientId: webClientId,
-    );
-    
-    final googleUser = await _retry(() => google_auth.GoogleSignIn.instance.authenticate());
-    
-    final googleAuth = googleUser.authentication;
-    final idToken = googleAuth.idToken;
-    // Attempt to get an access token, though idToken is primary for Supabase
-    final googleAuthz = await _retry(() => googleUser.authorizationClient.authorizationForScopes(['email', 'profile']));
-    final accessToken = googleAuthz?.accessToken;
-    
-    if (idToken == null) {
-      throw AppDataException('Missing Google Auth Tokens');
+      try {
+        await google_auth.GoogleSignIn.instance.initialize(
+          clientId: iosClientId,
+          serverClientId: webClientId,
+        );
+      } catch (_) {
+        // Safe to ignore if already initialized.
+      }
+      
+      // Native sign in flow (do NOT retry this, as it opens a modal overlay)
+      final googleUser = await google_auth.GoogleSignIn.instance.authenticate();
+      
+      final googleAuth = googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      
+      final googleAuthz = await googleUser.authorizationClient.authorizationForScopes(['email', 'profile']);
+      final accessToken = googleAuthz?.accessToken;
+      
+      if (idToken == null) {
+        throw const AppDataException('Missing Google Auth Tokens (idToken is null)');
+      }
+      
+      await _retry(() => client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
+      ));
+      
+      return true;
+    } catch (e) {
+      if (e is AppDataException) rethrow;
+      throw AppDataException('Google Login Error: ${describeError(e)}');
     }
-    
-    await _retry(() => client.auth.signInWithIdToken(
-      provider: OAuthProvider.google,
-      idToken: idToken,
-      accessToken: accessToken,
-    ));
-    
-    return true;
   }
 
   static User? get currentUser => client.auth.currentUser;

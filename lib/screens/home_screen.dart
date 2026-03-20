@@ -20,6 +20,8 @@ import '../services/cache_service.dart';
 import '../services/nfi_service.dart';
 import '../widgets/mood_checkin_widget.dart';
 import '../widgets/quick_action_fab.dart';
+import '../widgets/goal_card.dart';
+import '../widgets/edit_goals_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   final Map<String, dynamic>? profile;
@@ -43,16 +45,14 @@ class _HomeScreenState extends State<HomeScreen> {
   late final ValueNotifier<int> _stepsNotifier;
   late final ValueNotifier<double> _energyNotifier;
   late final ValueNotifier<int> _calorieNotifier;
+  late final ValueNotifier<int> _workoutMinNotifier;
+  late final ValueNotifier<double> _sleepNotifier;
 
   bool _loading = false;
-  bool _addWater = false;
-  String _waterAmt = '250';
-  bool _savingWater = false;
   Timer? _offlineSyncTimer;
 
   // NEW: NFI + Mood state
   NfiResult? _nfiResult;
-  bool _nfiLoading = true;
 
   @override
   void initState() {
@@ -70,6 +70,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _stepsNotifier = ValueNotifier<int>(0);
     _energyNotifier = ValueNotifier<double>(0.0);
     _calorieNotifier = ValueNotifier<int>(0);
+    _workoutMinNotifier = ValueNotifier<int>(0);
+    _sleepNotifier = ValueNotifier<double>(0.0);
 
     // Phase 14: Background Sync Trigger
     unawaited(workoutRepository.syncOfflineQueue());
@@ -95,6 +97,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _stepsNotifier.dispose();
     _energyNotifier.dispose();
     _calorieNotifier.dispose();
+    _workoutMinNotifier.dispose();
+    _sleepNotifier.dispose();
     super.dispose();
   }
 
@@ -126,7 +130,8 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ]);
 
-      final healthData = await HealthService.fetchDailySummary();
+      final summary = await HealthService.fetchDailySummary();
+      final healthSnap = await HealthService.getTodayHealthSnapshot();
 
       if (!mounted) return;
 
@@ -145,8 +150,9 @@ class _HomeScreenState extends State<HomeScreen> {
           final d = DateTime.tryParse(l['logged_at']?.toString() ?? '');
           return d != null && d.isAfter(todayStart);
         }).toList());
-        _stepsNotifier.value = (healthData['steps'] as num?)?.toInt() ?? 0;
-        _energyNotifier.value = (healthData['energy'] as num?)?.toDouble() ?? 0.0;
+        _stepsNotifier.value = (summary['steps'] as num?)?.toInt() ?? 0;
+        _energyNotifier.value = (summary['energy'] as num?)?.toDouble() ?? 0.0;
+        _sleepNotifier.value = (healthSnap['sleep_hours'] as num?)?.toDouble() ?? 0.0;
         _calorieNotifier.value = _nutritionLogs.where((l) {
           final d = DateTime.tryParse(l['logged_at']?.toString() ?? '');
           return d != null && d.isAfter(todayStart);
@@ -159,6 +165,12 @@ class _HomeScreenState extends State<HomeScreen> {
         cache.setList(CacheService.keyHomeLogs, _logs);
         cache.setList(CacheService.keyHomeWorkouts, _workouts);
         cache.setList(CacheService.keyWaterLogs, _waterLogs);
+
+        // Compute today's workout minutes
+        _workoutMinNotifier.value = _logs.where((l) {
+          final d = DateTime.tryParse(l['completed_at']?.toString() ?? '');
+          return d != null && d.isAfter(todayStart);
+        }).fold(0, (sum, l) => sum + ((l['duration_min'] as int?) ?? 0));
       });
     } catch (e) {
       if (mounted) setState(() => _loading = false);
@@ -176,11 +188,10 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _nfiResult = result;
-          _nfiLoading = false;
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _nfiLoading = false);
+      // Failed to load NFI
     }
   }
 
@@ -295,6 +306,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _openEditGoals(int calGoal, int waterGoal, int workoutGoal, double sleepGoal) {
+    EditGoalsSheet.show(
+      context,
+      caloriesGoal: calGoal,
+      waterGoalMl: waterGoal,
+      workoutGoalMin: workoutGoal,
+      sleepGoalHr: sleepGoal,
+      onSaved: _load,
+    );
+  }
+
   void _openLogMealSheet() {
     showModalBottomSheet<void>(
       context: context,
@@ -377,13 +399,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _logWater() async {
-    final ml = int.tryParse(_waterAmt);
-    if (ml == null || ml <= 0) return;
-    setState(() {
-      _savingWater = true;
-      _addWater = false;
-    });
+  Future<void> _logWaterAmount(int ml) async {
+    if (ml <= 0) return;
     try {
       final log = await SupabaseService.createWaterLog(
         SupabaseService.requireUserId(action: 'log water'),
@@ -395,22 +412,183 @@ class _HomeScreenState extends State<HomeScreen> {
       _waterLogs = [..._waterLogs, log];
       _waterNotifier.value = _calculateTotalWater(_waterLogs);
       cache.setList(CacheService.keyWaterLogs, _waterLogs);
-
-      setState(() {
-        _waterAmt = '250';
-        // _waterError = null; // This variable is not defined in the class.
-      });
     } catch (e) {
       final message = SupabaseService.describeError(e);
       if (!mounted) return;
-      // setState(() => _waterError = message); // This variable is not defined in the class.
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message), backgroundColor: ApexColors.red),
       );
     }
-    if (mounted) {
-      setState(() => _savingWater = false);
-    }
+
+  }
+
+  void _showWaterModal() {
+    String selectedAmt = '250';
+    final customC = TextEditingController();
+    bool isCustom = false;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setModalState) => GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              16, 16, 16, MediaQuery.of(sheetContext).viewInsets.bottom + 20,
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: ApexColors.surfaceStrong,
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: ApexColors.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: ApexColors.shadow.withAlpha(50),
+                    blurRadius: 24,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 42,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: ApexColors.borderStrong,
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        const Icon(Icons.water_drop_rounded,
+                            color: ApexColors.blue, size: 22),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Log Water Intake',
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 18,
+                            color: ApexColors.t1,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: ['250', '500', '750', 'Custom'].map((ml) {
+                        final isCust = ml == 'Custom';
+                        final selected = isCust ? isCustom : (!isCustom && selectedAmt == ml);
+                        return GestureDetector(
+                          onTap: () => setModalState(() {
+                            if (isCust) {
+                              isCustom = true;
+                            } else {
+                              isCustom = false;
+                              selectedAmt = ml;
+                            }
+                          }),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? ApexColors.blue.withAlpha(20)
+                                  : ApexColors.cardAlt,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: selected
+                                    ? ApexColors.blue
+                                    : ApexColors.border,
+                              ),
+                            ),
+                            child: Text(
+                              isCust ? 'Custom' : '$ml ml',
+                              style: TextStyle(
+                                color: selected
+                                    ? ApexColors.blue
+                                    : ApexColors.t2,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    if (isCustom) ...[
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: customC,
+                        keyboardType: TextInputType.number,
+                        autofocus: true,
+                        style: GoogleFonts.inter(
+                            fontSize: 16, color: ApexColors.t1),
+                        decoration: InputDecoration(
+                          hintText: 'Enter amount in ml',
+                          hintStyle: TextStyle(color: ApexColors.t3),
+                          suffixText: 'ml',
+                          suffixStyle:
+                              GoogleFonts.inter(color: ApexColors.t3),
+                          filled: true,
+                          fillColor: ApexColors.cardAlt,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 12),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ApexButton(
+                            text: 'Cancel',
+                            onPressed: () => Navigator.pop(sheetContext),
+                            tone: ApexButtonTone.outline,
+                            color: ApexColors.t1,
+                            full: true,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ApexButton(
+                            text: 'Save Intake',
+                            onPressed: () {
+                              final ml = isCustom
+                                  ? int.tryParse(customC.text) ?? 0
+                                  : int.tryParse(selectedAmt) ?? 0;
+                              if (ml > 0) {
+                                Navigator.pop(sheetContext);
+                                _logWaterAmount(ml);
+                              }
+                            },
+                            full: true,
+                            color: ApexColors.blue,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   int get _streak {
@@ -438,6 +616,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final calGoal = (widget.profile?['calorie_goal'] as int?) ?? 2000;
     final waterGoal = (widget.profile?['water_goal_ml'] as int?) ?? 2500;
+    final workoutGoal = (widget.profile?['workout_goal_min'] as int?) ?? 45;
+    final sleepGoal = (widget.profile?['sleep_goal_hr'] as num?)?.toDouble() ?? 8.0;
     final hour = DateTime.now().hour;
     final greet = hour < 12
         ? 'Morning'
@@ -540,174 +720,136 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 16),
 
-          // ── Activity Rings Card ───────────────────────────────
-          ApexCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Activity Rings',
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: ApexColors.t3,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    // Rings visualization
-                    SizedBox(
-                      width: 100,
-                      height: 100,
-                      child: CustomPaint(
-                        painter: _ActivityRingPainter(
-                          moveProgress: calGoal > 0 ? _calorieNotifier.value / calGoal : 0,
-                          exerciseProgress: (_stepsNotifier.value ~/ 100) / 45,
-                          standProgress: 10 / 12,
-                        ),
-                        child: Center(
-                          child: _nfiLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: ApexColors.accent,
-                                  ),
-                                )
-                              : Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      '${_nfiResult?.score ?? 0}',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w900,
-                                        color: ApexColors.t1,
-                                      ),
-                                    ),
-                                    Text(
-                                      'NFI',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.w800,
-                                        color: ApexColors.t3,
-                                        letterSpacing: 1,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                        ),
-                      ),
+          // ── Neural Fatigue Index ──────────────────────────────
+          if (_nfiResult != null) ...[
+            ApexCard(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: ApexColors.accent.withAlpha(50), width: 3),
                     ),
-                    const SizedBox(width: 20),
-                    // Ring legends
-                    Expanded(
+                    child: Center(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          _ringLegend('Move', _calorieNotifier.value, calGoal,
-                              'kcal', ApexColors.accent),
-                          const SizedBox(height: 10),
-                          _ringLegend('Exercise', _stepsNotifier.value ~/ 100,
-                              45, 'min', ApexColors.green),
-                          const SizedBox(height: 10),
-                          _ringLegend('Stand', 10, 12, 'hr', ApexColors.blue),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // ── Stats Mini Cards Row ──────────────────────────────
-          Row(
-            children: [
-              Expanded(
-                child: ApexCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.flash_on_rounded,
-                              color: ApexColors.accent, size: 16),
-                          const SizedBox(width: 4),
                           Text(
-                            'Workouts',
+                            '${_nfiResult?.score ?? 0}',
                             style: GoogleFonts.inter(
-                              fontSize: 11,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: ApexColors.t1,
+                            ),
+                          ),
+                          Text(
+                            'NFI',
+                            style: GoogleFonts.inter(
+                              fontSize: 8,
+                              fontWeight: FontWeight.w800,
                               color: ApexColors.t3,
-                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${_logs.length}',
-                        style: GoogleFonts.inter(
-                          fontSize: 28,
-                          color: ApexColors.t1,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      Text(
-                        'this week',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: ApexColors.t3,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Neural Fatigue Index',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: ApexColors.t2,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _nfiResult?.label ?? 'Analyzing...',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: ApexColors.accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // ── Activity Rings (Goals Grid) ────────────────────────
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 0.85,
+            padding: EdgeInsets.zero,
+            children: [
+              ValueListenableBuilder<int>(
+                valueListenable: _calorieNotifier,
+                builder: (context, cal, child) => GoalCard(
+                  icon: Icons.local_fire_department_rounded,
+                  label: 'Calories',
+                  current: cal.toDouble(),
+                  goal: calGoal.toDouble(),
+                  unit: 'kcal',
+                  color: ApexColors.accent,
+                  onTap: () => _openEditGoals(calGoal, waterGoal, workoutGoal, sleepGoal),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ApexCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.bedtime_rounded,
-                              color: ApexColors.blue, size: 16),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Sleep',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              color: ApexColors.t3,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '7h 12m',
-                        style: GoogleFonts.inter(
-                          fontSize: 28,
-                          color: ApexColors.t1,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      Text(
-                        'last night',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: ApexColors.t3,
-                        ),
-                      ),
-                    ],
-                  ),
+              ValueListenableBuilder<int>(
+                valueListenable: _waterNotifier,
+                builder: (context, ml, child) => GoalCard(
+                  icon: Icons.water_drop_rounded,
+                  label: 'Water',
+                  current: ml / 1000,
+                  goal: waterGoal / 1000,
+                  unit: 'liters',
+                  color: ApexColors.blue,
+                  onTap: () => _openEditGoals(calGoal, waterGoal, workoutGoal, sleepGoal),
                 ),
+              ),
+              ValueListenableBuilder<int>(
+                valueListenable: _workoutMinNotifier,
+                builder: (context, mins, child) => GoalCard(
+                  icon: Icons.timer_rounded,
+                  label: 'Workout',
+                  current: mins.toDouble(),
+                  goal: workoutGoal.toDouble(),
+                  unit: 'min',
+                  color: ApexColors.green,
+                  onTap: () => _openEditGoals(calGoal, waterGoal, workoutGoal, sleepGoal),
+                ),
+              ),
+              ValueListenableBuilder<double>(
+                valueListenable: _sleepNotifier,
+                builder: (context, sleep, child) {
+                  final overrideStatus = sleep >= sleepGoal ? 'Good Recovery' : 'Below Target';
+                  return GoalCard(
+                    icon: Icons.bedtime_rounded,
+                    label: 'Sleep',
+                    current: sleep,
+                    goal: sleepGoal,
+                    unit: 'hr',
+                    color: ApexColors.purple,
+                    overrideStatusText: overrideStatus,
+                    onTap: () => _openEditGoals(calGoal, waterGoal, workoutGoal, sleepGoal),
+                  );
+                },
               ),
             ],
           ),
@@ -717,73 +859,13 @@ class _HomeScreenState extends State<HomeScreen> {
           QuickActionFab(
             onStartWorkout: () => widget.onStartWorkout({}),
             onLogMeal: _openLogMealSheet,
-            onAddWater: () => setState(() => _addWater = !_addWater),
+            onAddWater: _showWaterModal,
             onLogWeight: _showWeightLogSheet,
             currentCalories: _calorieNotifier.value,
             targetCalories: calGoal,
             currentWaterMl: _waterNotifier.value,
             targetWaterMl: waterGoal,
           ),
-          const SizedBox(height: 12),
-          if (_addWater)
-            ApexCard(
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Log Water Intake',
-                        style: GoogleFonts.inter(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                          color: ApexColors.t1,
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => setState(() => _addWater = false),
-                        icon: const Icon(Icons.close_rounded, size: 20),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: ['250', '500', '750'].map((ml) {
-                      final selected = _waterAmt == ml;
-                      return GestureDetector(
-                        onTap: () => setState(() => _waterAmt = ml),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: selected ? ApexColors.blue.withAlpha(20) : ApexColors.cardAlt,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: selected ? ApexColors.blue : ApexColors.border,
-                            ),
-                          ),
-                          child: Text(
-                            '$ml ml',
-                            style: TextStyle(
-                              color: selected ? ApexColors.blue : ApexColors.t2,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
-                  ApexButton(
-                    text: 'Save intake',
-                    onPressed: _logWater,
-                    loading: _savingWater,
-                    full: true,
-                    color: ApexColors.blue,
-                  ),
-                ],
-              ),
-            ),
           const SizedBox(height: 12),
           // NEW: Mood check-in (Compacted)
           Padding(
@@ -994,43 +1076,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _ringLegend(
-      String label, int value, int goal, String unit, Color color) {
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            color: ApexColors.t2,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const Spacer(),
-        Text(
-          '$value',
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            color: ApexColors.t1,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        Text(
-          '/$goal $unit',
-          style: GoogleFonts.inter(
-            fontSize: 11,
-            color: ApexColors.t3,
-          ),
-        ),
-      ],
-    );
-  }
+
 
   // Drifting block removed
 
@@ -1518,6 +1564,7 @@ class _LogMealSheet extends StatefulWidget {
 
 class _LogMealSheetState extends State<_LogMealSheet> {
   final _foodController = TextEditingController();
+  final _quantityController = TextEditingController();
   final _caloriesController = TextEditingController();
   final _proteinController = TextEditingController();
   final _carbsController = TextEditingController();
@@ -1529,6 +1576,7 @@ class _LogMealSheetState extends State<_LogMealSheet> {
   @override
   void dispose() {
     _foodController.dispose();
+    _quantityController.dispose();
     _caloriesController.dispose();
     _proteinController.dispose();
     _carbsController.dispose();
@@ -1542,7 +1590,10 @@ class _LogMealSheetState extends State<_LogMealSheet> {
 
     setState(() => _loadingAI = true);
     try {
-      final res = await AIService.lookupNutrition(food, '');
+      final res = await AIService.lookupNutrition(
+        food,
+        _quantityController.text.trim(),
+      );
       if (mounted) {
         setState(() {
           if (res['calories'] != null) {
@@ -1573,6 +1624,9 @@ class _LogMealSheetState extends State<_LogMealSheet> {
       await SupabaseService.createNutritionLog({
         'user_id': userId,
         'meal_name': _foodController.text.trim(),
+        'quantity': _quantityController.text.trim().isNotEmpty
+            ? _quantityController.text.trim()
+            : null,
         'calories': int.tryParse(_caloriesController.text) ?? 0,
         'protein_g': double.tryParse(_proteinController.text) ?? 0,
         'carbs_g': double.tryParse(_carbsController.text) ?? 0,
@@ -1641,7 +1695,18 @@ class _LogMealSheetState extends State<_LogMealSheet> {
             ],
           ),
           const SizedBox(height: 16),
-          _buildTextField(_foodController, 'Food Name'),
+          Row(
+            children: [
+              Expanded(
+                child: _buildTextField(_foodController, 'Food Name'),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 100,
+                child: _buildTextField(_quantityController, 'Quantity'),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -1723,87 +1788,3 @@ class _LogMealSheetState extends State<_LogMealSheet> {
   }
 }
 
-class _ActivityRingPainter extends CustomPainter {
-  final double moveProgress;
-  final double exerciseProgress;
-  final double standProgress;
-
-  const _ActivityRingPainter({
-    required this.moveProgress,
-    required this.exerciseProgress,
-    required this.standProgress,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    const strokeWidth = 10.0;
-    const spacing = 2.0;
-
-    // 1. Move Ring (Outer - Red)
-    _drawRing(
-      canvas,
-      center,
-      (size.width / 2) - (strokeWidth / 2),
-      strokeWidth,
-      ApexColors.ringMove,
-      moveProgress,
-    );
-
-    // 2. Exercise Ring (Middle - Green)
-    _drawRing(
-      canvas,
-      center,
-      (size.width / 2) - (strokeWidth * 1.5) - spacing,
-      strokeWidth,
-      ApexColors.ringExercise,
-      exerciseProgress,
-    );
-
-    // 3. Stand Ring (Inner - Blue)
-    _drawRing(
-      canvas,
-      center,
-      (size.width / 2) - (strokeWidth * 2.5) - (spacing * 2),
-      strokeWidth,
-      ApexColors.ringStand,
-      standProgress,
-    );
-  }
-
-  void _drawRing(
-    Canvas canvas,
-    Offset center,
-    double radius,
-    double strokeWidth,
-    Color color,
-    double progress,
-  ) {
-    if (radius <= 0) return;
-
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-
-    // Draw background track
-    paint.color = color.withValues(alpha: 0.15);
-    canvas.drawCircle(center, radius, paint);
-
-    // Draw progress arc
-    paint.color = color;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -1.5708, // -90 degrees
-      2 * 3.14159 * progress.clamp(0.01, 2.0), // Support over-completion slightly
-      false,
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_ActivityRingPainter old) =>
-      old.moveProgress != moveProgress ||
-      old.exerciseProgress != exerciseProgress ||
-      old.standProgress != standProgress;
-}
