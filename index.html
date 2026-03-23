@@ -2,7 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover,user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Apex AI"/>
+<link rel="apple-touch-icon" href="IMG_0886.png"/>
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#0C1219"/>
 <title>APEX AI — Fitness Coach v3</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -724,7 +730,16 @@ function App(){
   </div>);
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+const root = ReactDOM.createRoot(document.getElementById("root"));
+// Service Worker Registration
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.log('SW registration failed:', err));
+  });
+}
+root.render(<App/>);
 </script>
 </body>
 </html>
