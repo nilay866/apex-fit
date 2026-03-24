@@ -16,9 +16,9 @@ class NfiRingWidget extends StatelessWidget {
 
   Color get _ringColor {
     final s = result?.score ?? 50;
-    if (s >= 80) return ApexColors.accentSoft; // green
-    if (s >= 50) return const Color(0xFFFFAA00); // amber
-    return const Color(0xFFFF3C50); // red
+    if (s >= 80) return ApexColors.green;
+    if (s >= 50) return ApexColors.nfiAmber;
+    return ApexColors.nfiRed;
   }
 
   @override

@@ -53,9 +53,62 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _signOut() async {
-    try {
-      await SupabaseService.signOut();
-    } catch (_) {}
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ApexColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Sign out?',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+            color: ApexColors.t1,
+          ),
+        ),
+        content: Text(
+          'You will be returned to the login screen.',
+          style: GoogleFonts.inter(fontSize: 13, color: ApexColors.t2),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.inter(
+                color: ApexColors.t2,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              'Sign out',
+              style: GoogleFonts.inter(
+                color: ApexColors.red,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      try {
+        await SupabaseService.signOut();
+      } catch (_) {}
+    }
+  }
+
+  void _showComingSoon(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$feature — coming soon'),
+        backgroundColor: ApexColors.surface,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -184,7 +237,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   'Sync steps, sleep & HRV',
                   Icons.favorite_rounded,
                   ApexColors.red,
-                  onTap: () {},
+                  onTap: () => _showComingSoon('Apple Health sync'),
                 ),
                 _divider(),
                 _linkRow(
@@ -192,7 +245,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   'Sync activity data',
                   Icons.directions_run_rounded,
                   ApexColors.blue,
-                  onTap: () {},
+                  onTap: () => _showComingSoon('Google Fit sync'),
                 ),
               ],
             ),
@@ -208,7 +261,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   'Name, photo, bio',
                   Icons.person_rounded,
                   ApexColors.accent,
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.pop(context);
+                  },
                 ),
                 _divider(),
                 _linkRow(
@@ -216,7 +271,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   'Who can see your activity',
                   Icons.lock_rounded,
                   ApexColors.t2,
-                  onTap: () {},
+                  onTap: () => _showComingSoon('Privacy settings'),
                 ),
               ],
             ),

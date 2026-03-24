@@ -44,7 +44,7 @@ class _PrCelebrationOverlayState extends State<PrCelebrationOverlay> {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.black.withAlpha(200),
+      color: ApexColors.overlay,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -57,9 +57,9 @@ class _PrCelebrationOverlayState extends State<PrCelebrationOverlay> {
               numberOfParticles: 30,
               colors: const [
                 ApexColors.accentSoft,
-                Colors.white,
-                Color(0xFFFFD600),
-                Color(0xFF3D9BFF),
+                ApexColors.ink,
+                ApexColors.yellow,
+                ApexColors.blue,
               ],
             ),
           ),

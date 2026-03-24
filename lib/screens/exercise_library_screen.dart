@@ -313,7 +313,36 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                 ? const Center(
                     child: CircularProgressIndicator(color: ApexColors.accent),
                   )
-                : ListView.builder(
+                : _exercises.isEmpty
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(32),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.search_off_rounded,
+                                  size: 48, color: ApexColors.t3),
+                              SizedBox(height: 12),
+                              Text(
+                                'No exercises found',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: ApexColors.t2,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                'Try adjusting your filters or search term.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    fontSize: 13, color: ApexColors.t3),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     itemCount: _exercises.length,
                     itemBuilder: (ctx, i) {

@@ -14,6 +14,7 @@ class WorkoutProgramsScreen extends StatefulWidget {
 class _WorkoutProgramsScreenState extends State<WorkoutProgramsScreen> {
   List<Map<String, dynamic>> _programs = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -22,13 +23,25 @@ class _WorkoutProgramsScreenState extends State<WorkoutProgramsScreen> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
-    final res = await SupabaseService.getWorkoutPrograms();
-    if (mounted) {
-      setState(() {
-        _programs = res;
-        _loading = false;
-      });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final res = await SupabaseService.getWorkoutPrograms();
+      if (mounted) {
+        setState(() {
+          _programs = res;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = SupabaseService.describeError(e);
+        });
+      }
     }
   }
 
@@ -37,15 +50,25 @@ class _WorkoutProgramsScreenState extends State<WorkoutProgramsScreen> {
     if (userId == null) return;
 
     Haptics.vibrate(HapticsType.medium);
-    await SupabaseService.enrollInProgram(userId, programId);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Successfully enrolled in program!'),
-          backgroundColor: ApexColors.accent,
-        ),
-      );
+    try {
+      await SupabaseService.enrollInProgram(userId, programId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Successfully enrolled in program!'),
+            backgroundColor: ApexColors.accent,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Enrollment failed: ${SupabaseService.describeError(e)}'),
+            backgroundColor: ApexColors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -69,9 +92,45 @@ class _WorkoutProgramsScreenState extends State<WorkoutProgramsScreen> {
           ? const Center(
               child: CircularProgressIndicator(color: ApexColors.accent),
             )
-          : _programs.isEmpty
-          ? _buildEmptyState()
-          : ListView.builder(
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline_rounded,
+                            color: ApexColors.red, size: 40),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Failed to load programs',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: ApexColors.t1),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontSize: 12, color: ApexColors.t3),
+                        ),
+                        const SizedBox(height: 16),
+                        TextButton.icon(
+                          onPressed: _load,
+                          icon: const Icon(Icons.refresh_rounded,
+                              color: ApexColors.accent),
+                          label: const Text('Retry',
+                              style: TextStyle(color: ApexColors.accent)),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : _programs.isEmpty
+              ? _buildEmptyState()
+              : ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: _programs.length,
               itemBuilder: (ctx, i) {

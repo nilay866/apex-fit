@@ -285,6 +285,7 @@ class _ApexOrbLogoState extends State<ApexOrbLogo>
       final end = single.length.clamp(1, 2);
       return single.substring(0, end).toUpperCase();
     }
-    return (parts.first[0] + parts[1][0]).toUpperCase();
+    final second = parts[1].isNotEmpty ? parts[1][0] : '';
+    return (parts.first[0] + second).toUpperCase();
   }
 }

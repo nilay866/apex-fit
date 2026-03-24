@@ -16,6 +16,7 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
   List<Achievement> _unlocked = [];
   List<Achievement> _locked = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -42,8 +43,13 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
           _loading = false;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = SupabaseService.describeError(e);
+        });
+      }
     }
   }
 
@@ -68,7 +74,44 @@ class _AchievementsScreenState extends State<AchievementsScreen> {
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(color: ApexColors.accent))
-          : ListView(
+          : _error != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline_rounded,
+                            color: ApexColors.red, size: 40),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Failed to load achievements',
+                          style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: ApexColors.t1),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontSize: 12, color: ApexColors.t3),
+                        ),
+                        const SizedBox(height: 16),
+                        TextButton.icon(
+                          onPressed: _load,
+                          icon: const Icon(Icons.refresh_rounded,
+                              color: ApexColors.accent),
+                          label: const Text('Retry',
+                              style:
+                                  TextStyle(color: ApexColors.accent)),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
               children: [
                 // Summary

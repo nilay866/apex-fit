@@ -46,4 +46,20 @@ class ApexColors {
 
   // ── Dark action color (for black buttons) ────────────────────
   static const Color darkAction = Color(0xFF1C1C1E);
+
+  // ── Overlay / Modal Colors ───────────────────────────────────
+  /// Semi-transparent dark overlay for modals / banners (94% opaque)
+  static const Color overlay = Color(0xF2000000);
+  /// Light scrim for bottom sheets
+  static const Color scrim = Color(0x80000000);
+
+  // ── Pace / Map UI Colors ─────────────────────────────────────
+  /// Light blue used for pace display on map screen
+  static const Color paceBlue = Color(0xFF64B5F6);
+
+  // ── NFI Ring Colors ──────────────────────────────────────────
+  /// Amber used for mid-range NFI score
+  static const Color nfiAmber = Color(0xFFFFAA00);
+  /// Red used for low NFI score
+  static const Color nfiRed = Color(0xFFFF3C50);
 }

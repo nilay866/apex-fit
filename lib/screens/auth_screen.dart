@@ -225,7 +225,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                 color: ApexColors.t1,
                               ),
                               decoration: const InputDecoration(
-                                hintText: 'Nilay Chavhan',
+                                hintText: 'Your full name',
                               ),
                             ),
                             const SizedBox(height: 14),

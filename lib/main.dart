@@ -138,7 +138,7 @@ class _ApexAIAppState extends State<ApexAIApp> {
     return MaterialApp(
       title: 'APEX AI',
       debugShowCheckedModeBanner: false,
-      theme: ApexTheme.dark,
+      theme: ApexTheme.light,
       home: _buildScreen(),
     );
   }

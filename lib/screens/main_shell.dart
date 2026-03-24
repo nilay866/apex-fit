@@ -230,7 +230,7 @@ class _MainShellState extends State<MainShell> {
   // ── Cardio map + live top banner ─────────────────────────────────────────
   Widget _cardioWithLiveBar() {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: ApexColors.darkAction,
       body: Stack(
         children: [
           // Full-screen map
@@ -337,7 +337,7 @@ class _RunLiveBanner extends StatelessWidget {
     return Container(
       padding: EdgeInsets.fromLTRB(16, topPad + 6, 16, 10),
       decoration: BoxDecoration(
-        color: const Color(0xF2000000),
+        color: ApexColors.overlay,
         border: Border(
           bottom: BorderSide(color: ApexColors.accent.withAlpha(80), width: 1),
         ),
@@ -441,7 +441,7 @@ class _RunLiveBanner extends StatelessWidget {
               Text(
                 formattedPace,
                 style: GoogleFonts.inter(
-                  color: const Color(0xFF64B5F6),
+                  color: ApexColors.paceBlue,
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                 ),

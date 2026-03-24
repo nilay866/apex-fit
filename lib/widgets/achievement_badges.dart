@@ -15,7 +15,8 @@ class AchievementBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Color(int.parse(achievement.color));
+    final colorValue = int.tryParse(achievement.color) ?? 0xFFFF2D55;
+    final color = Color(colorValue);
 
     return Container(
       width: 100,

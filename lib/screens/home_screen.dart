@@ -49,6 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final ValueNotifier<double> _sleepNotifier;
 
   bool _loading = false;
+  String? _loadError;
   Timer? _offlineSyncTimer;
 
   // NEW: NFI + Mood state
@@ -107,6 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_logs.isEmpty && _workouts.isEmpty) {
       setState(() => _loading = true);
     }
+    setState(() => _loadError = null);
 
     try {
       final userId = SupabaseService.requireUserId(
@@ -173,7 +175,12 @@ class _HomeScreenState extends State<HomeScreen> {
         }).fold(0, (sum, l) => sum + ((l['duration_min'] as int?) ?? 0));
       });
     } catch (e) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadError = SupabaseService.describeError(e);
+        });
+      }
     }
   }
 
@@ -645,6 +652,35 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
         children: [
+          if (_loadError != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: ApexColors.red.withAlpha(15),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: ApexColors.red.withAlpha(60)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded,
+                        color: ApexColors.red, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Could not refresh data. Pull down to retry.',
+                        style: TextStyle(
+                          color: ApexColors.red,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           // ── Clean Greeting Header ─────────────────────────────
           Text(
             'Good $greet,',

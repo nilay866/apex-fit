@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:apex_ai/constants/colors.dart';
 import 'package:apex_ai/widgets/apex_card.dart';
 import 'package:apex_ai/widgets/apex_button.dart';
@@ -15,45 +16,86 @@ class ChallengesScreen extends StatefulWidget {
 class _ChallengesScreenState extends State<ChallengesScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabs;
+  Set<String> _joinedIds = {};
 
-  // Sample challenges — replace with Supabase fetch when table exists
-  final List<Map<String, dynamic>> _activeChallenges = [
+  // Challenges data — will be replaced by Supabase fetch once the
+  // `challenges` table is added to the schema.
+  static const List<Map<String, dynamic>> _challengeList = [
     {
+      'id': 'strength_30',
       'title': '30-Day Strength Challenge',
       'description': 'Complete 20 strength workouts in 30 days',
       'participants': 1243,
       'daysLeft': 18,
       'progress': 0.6,
-      'color': 0xFF00FFA0,
+      'colorKey': 'green',
       'icon': '🏋️',
-      'joined': true,
     },
     {
+      'id': 'steps_march',
       'title': 'March Step Master',
       'description': 'Hit 10,000 steps every day this month',
       'participants': 3892,
       'daysLeft': 14,
       'progress': 0.43,
-      'color': 0xFF3D9BFF,
+      'colorKey': 'blue',
       'icon': '🏃',
-      'joined': false,
     },
     {
+      'id': 'protein_king',
       'title': 'Protein King',
       'description': 'Hit your protein goal 25 days this month',
       'participants': 567,
       'daysLeft': 14,
       'progress': 0.0,
-      'color': 0xFFFF6B2B,
+      'colorKey': 'orange',
       'icon': '🥩',
-      'joined': false,
     },
   ];
+
+  Color _colorForKey(String key) {
+    switch (key) {
+      case 'green':
+        return ApexColors.green;
+      case 'blue':
+        return ApexColors.blue;
+      case 'orange':
+        return ApexColors.orange;
+      default:
+        return ApexColors.accent;
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
+    _loadJoined();
+  }
+
+  Future<void> _loadJoined() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final joined = prefs.getStringList('apex_joined_challenges') ?? [];
+      if (mounted) setState(() => _joinedIds = joined.toSet());
+    } catch (_) {}
+  }
+
+  Future<void> _joinChallenge(Map<String, dynamic> c) async {
+    final id = c['id'] as String;
+    setState(() => _joinedIds.add(id));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('apex_joined_challenges', _joinedIds.toList());
+    } catch (_) {}
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Joined: ${c['title']}'),
+          backgroundColor: _colorForKey(c['colorKey'] as String),
+        ),
+      );
+    }
   }
 
   @override
@@ -64,6 +106,10 @@ class _ChallengesScreenState extends State<ChallengesScreen>
 
   @override
   Widget build(BuildContext context) {
+    final joined = _challengeList
+        .where((c) => _joinedIds.contains(c['id'] as String))
+        .toList();
+
     return Scaffold(
       backgroundColor: ApexColors.bg,
       appBar: AppBar(
@@ -100,11 +146,11 @@ class _ChallengesScreenState extends State<ChallengesScreen>
           // ALL CHALLENGES
           ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-            itemCount: _activeChallenges.length,
-            itemBuilder: (_, i) => _challengeCard(_activeChallenges[i]),
+            itemCount: _challengeList.length,
+            itemBuilder: (_, i) => _challengeCard(_challengeList[i]),
           ),
           // MY CHALLENGES
-          _activeChallenges.where((c) => c['joined'] == true).isEmpty
+          joined.isEmpty
               ? const EmptyStateWidget(
                   icon: Icons.emoji_events_outlined,
                   title: 'No active challenges',
@@ -112,15 +158,9 @@ class _ChallengesScreenState extends State<ChallengesScreen>
                 )
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-                  itemCount: _activeChallenges
-                      .where((c) => c['joined'] == true)
-                      .length,
-                  itemBuilder: (_, i) {
-                    final joined = _activeChallenges
-                        .where((c) => c['joined'] == true)
-                        .toList();
-                    return _challengeCard(joined[i], showProgress: true);
-                  },
+                  itemCount: joined.length,
+                  itemBuilder: (_, i) =>
+                      _challengeCard(joined[i], showProgress: true),
                 ),
         ],
       ),
@@ -131,8 +171,8 @@ class _ChallengesScreenState extends State<ChallengesScreen>
     Map<String, dynamic> c, {
     bool showProgress = false,
   }) {
-    final color = Color(c['color'] as int);
-    final joined = c['joined'] as bool? ?? false;
+    final color = _colorForKey(c['colorKey'] as String);
+    final joined = _joinedIds.contains(c['id'] as String);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -186,7 +226,7 @@ class _ChallengesScreenState extends State<ChallengesScreen>
                 ),
                 if (joined) ...[
                   const SizedBox(width: 8),
-                  _pill('Joined ✓', Icons.check_circle_rounded, color),
+                  _pill('Joined', Icons.check_circle_rounded, color),
                 ],
               ],
             ),
@@ -225,15 +265,7 @@ class _ChallengesScreenState extends State<ChallengesScreen>
               const SizedBox(height: 14),
               ApexButton(
                 text: 'Join Challenge',
-                onPressed: () {
-                  setState(() => c['joined'] = true);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Joined: ${c['title']}'),
-                      backgroundColor: color,
-                    ),
-                  );
-                },
+                onPressed: () => _joinChallenge(c),
                 sm: true,
                 full: true,
                 color: color,

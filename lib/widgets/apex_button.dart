@@ -80,15 +80,6 @@ class ApexButton extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: sm ? 16 : 20),
         ).copyWith(
           overlayColor: WidgetStatePropertyAll(foregroundColor.withAlpha(18)),
-          elevation: WidgetStateProperty.resolveWith((states) {
-            if (!isPrimary || states.contains(WidgetState.disabled)) {
-              return 0;
-            }
-            if (states.contains(WidgetState.pressed)) {
-              return 0;
-            }
-            return 0;
-          }),
         ),
         child: loading
             ? SizedBox(

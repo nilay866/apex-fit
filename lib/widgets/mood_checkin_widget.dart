@@ -42,7 +42,19 @@ class _MoodCheckinWidgetState extends State<MoodCheckinWidget> {
         if (mounted) setState(() => _saved = true);
         widget.onMoodChanged?.call(mood);
       }
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Could not save mood: ${SupabaseService.describeError(e)}',
+            ),
+            backgroundColor: ApexColors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   @override

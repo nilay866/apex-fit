@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'colors.dart';
 
 class ApexTheme {
-  static ThemeData get dark {
+  static ThemeData get light {
     final base = ThemeData.light(useMaterial3: true);
     return base.copyWith(
       brightness: Brightness.light,
