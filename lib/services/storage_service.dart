@@ -1,11 +1,16 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:async';
+import '../utils/secure_storage.dart';
 
 class StorageService {
   static const _cfgKey = 'apexcfg_v4';
   static const _ssKey = 'apex_session_v4';
   static const _offlineActionsKey = 'apex_offline_actions_v1';
+
+  // SEC-FIX: Keys for secure storage (tokens, AWS credentials)
+  static const _secureSessionKey = 'apex_secure_session_v1';
+  static const _secureAwsKey = 'apex_secure_aws_v1';
 
   static Future<void> saveConfig({
     required String url,
@@ -26,6 +31,7 @@ class StorageService {
     return jsonDecode(s) as Map<String, dynamic>;
   }
 
+  // SEC-FIX: Session tokens stored in encrypted secure storage
   static Future<void> saveSession({
     required Map<String, dynamic> user,
     required String token,
@@ -34,9 +40,8 @@ class StorageService {
     required String goal,
     Map<String, dynamic>? profile,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _ssKey,
+    await SecureStorage.write(
+      _secureSessionKey,
       jsonEncode({
         'user': user,
         'token': token,
@@ -50,10 +55,19 @@ class StorageService {
   }
 
   static Future<Map<String, dynamic>?> loadSession() async {
+    // SEC-FIX: Read from secure storage, fall back to legacy SharedPrefs for migration
+    final s = await SecureStorage.read(_secureSessionKey);
+    if (s != null) return jsonDecode(s) as Map<String, dynamic>;
+
+    // Migration: check legacy key, move to secure storage if found
     final prefs = await SharedPreferences.getInstance();
-    final s = prefs.getString(_ssKey);
-    if (s == null) return null;
-    return jsonDecode(s) as Map<String, dynamic>;
+    final legacy = prefs.getString(_ssKey);
+    if (legacy != null) {
+      await SecureStorage.write(_secureSessionKey, legacy);
+      await prefs.remove(_ssKey); // Delete insecure copy
+      return jsonDecode(legacy) as Map<String, dynamic>;
+    }
+    return null;
   }
 
   static const _offlineLogsKey = 'apex_offline_workouts_v1';
@@ -131,15 +145,15 @@ class StorageService {
   static const _aiProviderKey = 'apex_ai_provider_v1';
   static const _exerciseApiKey = 'apex_exercise_api_key_v1';
 
+  // SEC-FIX: AWS credentials stored in encrypted secure storage
   static Future<void> saveAWSConfig({
     required String accessKey,
     required String secretKey,
     required String region,
     String? modelId,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _awsCfgKey,
+    await SecureStorage.write(
+      _secureAwsKey,
       jsonEncode({
         'accessKey': accessKey,
         'secretKey': secretKey,
@@ -150,10 +164,18 @@ class StorageService {
   }
 
   static Future<Map<String, dynamic>?> loadAWSConfig() async {
+    final s = await SecureStorage.read(_secureAwsKey);
+    if (s != null) return jsonDecode(s) as Map<String, dynamic>;
+
+    // Migration: move legacy plaintext to secure storage
     final prefs = await SharedPreferences.getInstance();
-    final s = prefs.getString(_awsCfgKey);
-    if (s == null) return null;
-    return jsonDecode(s) as Map<String, dynamic>;
+    final legacy = prefs.getString(_awsCfgKey);
+    if (legacy != null) {
+      await SecureStorage.write(_secureAwsKey, legacy);
+      await prefs.remove(_awsCfgKey);
+      return jsonDecode(legacy) as Map<String, dynamic>;
+    }
+    return null;
   }
 
   static Future<void> saveAIProvider(String provider) async {
@@ -208,5 +230,8 @@ class StorageService {
     await prefs.remove(_aiProviderKey);
     await prefs.remove(_exerciseApiKey);
     await prefs.remove(_offlineActionsKey);
+    // SEC-FIX: Also clear secure storage
+    await SecureStorage.delete(_secureSessionKey);
+    await SecureStorage.delete(_secureAwsKey);
   }
 }

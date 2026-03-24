@@ -837,7 +837,9 @@ class SupabaseService {
       if (equipment != null) query = query.eq('equipment', equipment);
       if (environment != null) query = query.eq('environment', environment);
       if (taxonomy != null) {
-        query = query.ilike('taxonomy_folder', '%$taxonomy%');
+        // SEC-FIX: Escape LIKE wildcards to prevent filter bypass injection
+        final escaped = taxonomy.replaceAll('%', r'\%').replaceAll('_', r'\_');
+        query = query.ilike('taxonomy_folder', '%$escaped%');
       }
 
       final res = await _retry(() => query.order('name'));

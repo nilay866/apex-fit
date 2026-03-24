@@ -623,13 +623,18 @@ class _CommunityAddModalState extends State<_CommunityAddModal> {
                             if (_connecting) return;
                             final List<Barcode> barcodes = capture.barcodes;
                             for (final barcode in barcodes) {
-                              if (barcode.rawValue != null) {
-                                try {
-                                  final data = jsonDecode(barcode.rawValue!);
-                                  if (data['id'] != null) {
-                                    _connect(data['id'] as String);
-                                  }
-                                } catch (_) {}
+                              if (barcode.rawValue == null) continue;
+                              // SEC-FIX: Validate barcode data before using
+                              try {
+                                final decoded = jsonDecode(barcode.rawValue!);
+                                if (decoded is! Map<String, dynamic>) continue;
+                                final id = decoded['id'];
+                                if (id is! String || id.isEmpty) continue;
+                                // SEC-FIX: Validate UUID format to prevent injection
+                                if (!RegExp(r'^[a-f0-9\-]{36}$').hasMatch(id)) continue;
+                                _connect(id);
+                              } catch (e) {
+                                debugPrint('Invalid QR data: $e');
                               }
                             }
                           },

@@ -15,20 +15,22 @@ class SocialService {
     final normalized = query.trim();
     if (normalized.isEmpty) return [];
 
+    // SEC-FIX: Escape LIKE wildcards from user input to prevent filter bypass
+    final escaped = normalized.replaceAll('%', r'\%').replaceAll('_', r'\_');
     final myId = SupabaseService.currentUser?.id;
 
     try {
       final res = await client
           .from('profiles')
           .select('id, name, avatar_data, goal')
-          .or('name.ilike.%$normalized%, email.ilike.%$normalized%')
+          .or('name.ilike.%$escaped%, email.ilike.%$escaped%')
           .limit(10);
       return _dedupeProfiles(List<Map<String, dynamic>>.from(res), myId);
     } catch (_) {
       final res = await client
           .from('profiles')
           .select('id, name, avatar_data, goal')
-          .ilike('name', '%$normalized%')
+          .ilike('name', '%$escaped%')
           .limit(10);
       return _dedupeProfiles(List<Map<String, dynamic>>.from(res), myId);
     }

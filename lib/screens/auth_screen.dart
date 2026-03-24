@@ -46,17 +46,33 @@ class _AuthScreenState extends State<AuthScreen> {
     'General Fitness': Icons.favorite_rounded,
   };
 
+  // SEC-FIX: Proper email format validation
+  static final _emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
   Future<void> _submit() async {
-    if (_emailC.text.trim().isEmpty || _pwC.text.isEmpty) {
+    final email = _emailC.text.trim();
+    final pw = _pwC.text;
+
+    if (email.isEmpty || pw.isEmpty) {
       setState(() => _err = 'Enter email and password.');
+      return;
+    }
+    // SEC-FIX: Validate email format before sending to auth
+    if (!_emailRegex.hasMatch(email)) {
+      setState(() => _err = 'Enter a valid email address.');
       return;
     }
     if (!_isLogin && _nameC.text.trim().isEmpty) {
       setState(() => _err = 'Name required.');
       return;
     }
-    if (_pwC.text.length < 6) {
-      setState(() => _err = 'Password must be 6+ characters.');
+    // SEC-FIX: Enforce stronger password — min 8 chars with mixed types
+    if (pw.length < 8) {
+      setState(() => _err = 'Password must be 8+ characters.');
+      return;
+    }
+    if (!_isLogin && !RegExp(r'^(?=.*[a-zA-Z])(?=.*\d)').hasMatch(pw)) {
+      setState(() => _err = 'Password must include letters and numbers.');
       return;
     }
 
@@ -223,12 +239,14 @@ class _AuthScreenState extends State<AuthScreen> {
                             TextField(
                               key: const ValueKey('auth_name_field'),
                               controller: _nameC,
+                              maxLength: 100, // SEC-FIX: Limit input length
                               style: GoogleFonts.inter(
                                 fontSize: 14,
                                 color: ApexColors.t1,
                               ),
                               decoration: const InputDecoration(
                                 hintText: 'Your full name',
+                                counterText: '', // Hide counter
                               ),
                             ),
                             const SizedBox(height: 14),
@@ -239,12 +257,14 @@ class _AuthScreenState extends State<AuthScreen> {
                             key: const ValueKey('auth_email_field'),
                             controller: _emailC,
                             keyboardType: TextInputType.emailAddress,
+                            maxLength: 254, // SEC-FIX: RFC 5321 max email length
                             style: GoogleFonts.inter(
                               fontSize: 14,
                               color: ApexColors.t1,
                             ),
                             decoration: const InputDecoration(
                               hintText: 'you@example.com',
+                              counterText: '',
                             ),
                           ),
                           const SizedBox(height: 14),
@@ -254,12 +274,14 @@ class _AuthScreenState extends State<AuthScreen> {
                             key: const ValueKey('auth_password_field'),
                             controller: _pwC,
                             obscureText: true,
+                            maxLength: 128, // SEC-FIX: Prevent oversized password payloads
                             style: GoogleFonts.inter(
                               fontSize: 14,
                               color: ApexColors.t1,
                             ),
                             decoration: const InputDecoration(
-                              hintText: 'Minimum 6 characters',
+                              hintText: 'Minimum 8 characters',
+                              counterText: '',
                             ),
                           ),
                           if (!_isLogin) ...[

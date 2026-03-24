@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 import '../supabase_service.dart';
 import 'ai_provider.dart';
@@ -26,7 +27,9 @@ class BedrockProvider implements AIProvider {
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Bedrock Proxy Error (${response.statusCode}): ${response.body}');
+      // SEC-FIX: Don't expose raw server response to user — log it instead
+      debugPrint('Bedrock proxy error ${response.statusCode}: ${response.body}');
+      throw Exception('AI request failed. Please try again.');
     }
 
     final data = jsonDecode(response.body);
