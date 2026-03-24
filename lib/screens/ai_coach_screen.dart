@@ -206,7 +206,7 @@ class _AiCoachScreenState extends State<AiCoachScreen> {
                           ),
                           border: isUser ? null : Border.all(color: ApexColors.border),
                         ),
-                        child: Text(m['content']!, style: TextStyle(color: isUser ? ApexColors.bg : ApexColors.t1, fontSize: 12, height: 1.6)),
+                        child: Text(m['content'] ?? '', style: TextStyle(color: isUser ? ApexColors.bg : ApexColors.t1, fontSize: 12, height: 1.6)),
                       ),
                     ),
                   ],

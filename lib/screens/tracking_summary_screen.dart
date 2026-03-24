@@ -58,7 +58,7 @@ class _TrackingSummaryScreenState extends State<TrackingSummaryScreen> {
         elevationGain: widget.elevationGain,
         elevationLoss: widget.elevationLoss,
         avgPace: widget.avgPace,
-        avgSpeed: widget.distanceKm > 0
+        avgSpeed: widget.distanceKm > 0 && widget.durationSeconds > 0
             ? (widget.distanceKm * 1000) / widget.durationSeconds
             : 0,
         maxSpeed: widget.maxSpeed,

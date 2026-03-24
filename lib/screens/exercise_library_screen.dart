@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:haptic_feedback/haptic_feedback.dart';
+import '../utils/safe_haptics.dart';
 import '../constants/colors.dart';
 import '../services/exercise_animation_service.dart';
 import '../services/supabase_service.dart';
@@ -64,7 +64,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
   }
 
   void _onMuscleTap(String muscle) {
-    Haptics.vibrate(HapticsType.selection);
+    SafeHaptics.vibrate(HapticsType.selection);
     setState(() {
       _selectedMuscle = _selectedMuscle == muscle ? null : muscle;
     });
@@ -72,7 +72,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
   }
 
   void _onEnvTap(String env) {
-    Haptics.vibrate(HapticsType.selection);
+    SafeHaptics.vibrate(HapticsType.selection);
     setState(() {
       _selectedEnv = _selectedEnv == env ? null : env;
     });
@@ -80,7 +80,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
   }
 
   void _onDifficultyTap(String difficulty) {
-    Haptics.vibrate(HapticsType.selection);
+    SafeHaptics.vibrate(HapticsType.selection);
     setState(() {
       _selectedDifficulty = _selectedDifficulty == difficulty
           ? null
@@ -356,7 +356,7 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                               null;
                       return GestureDetector(
                         onTap: () {
-                          Haptics.vibrate(HapticsType.light);
+                          SafeHaptics.vibrate(HapticsType.light);
                           if (widget.onSelect != null) {
                             widget.onSelect!(ex);
                           } else {

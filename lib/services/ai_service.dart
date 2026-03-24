@@ -50,8 +50,8 @@ class AIService {
       throw Exception('Parsed JSON is not a Map');
     } catch (e) {
       debugPrint('AI JSON Parse Error: $e');
-      debugPrint('Raw AI Output: $raw');
-      throw Exception('Could not parse JSON from AI: $e');
+      // Don't log raw AI output — may contain sensitive data
+      throw Exception('Could not parse AI response. Please try again.');
     }
   }
 
@@ -148,7 +148,7 @@ Realistic values, 100g default if no qty given.''';
       _nutritionCache[cacheKey] = Map<String, dynamic>.from(parsed);
       return parsed;
     } catch (e) {
-      debugPrint('AI Nutrition Error for "$food": $e');
+      debugPrint('AI Nutrition lookup failed: $e');
       final fallback = {
         'calories': 250,
         'protein_g': 15,

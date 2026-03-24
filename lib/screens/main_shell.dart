@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:haptic_feedback/haptic_feedback.dart';
+import '../utils/safe_haptics.dart';
 import '../constants/colors.dart';
 import '../repositories/auth_repository.dart';
 import '../repositories/profile_repository.dart';
@@ -64,14 +64,18 @@ class _MainShellState extends State<MainShell> {
   Future<void> _syncOfflineData() async {
     try {
       await workoutRepository.syncOfflineQueue();
-    } catch (_) {}
+    } catch (_) {
+      // Offline sync is best-effort, non-critical
+    }
   }
 
   Future<void> _loadProfile() async {
     try {
       final profile = await profileRepository.getCurrentProfile();
       if (mounted) setState(() => _profile = profile);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Profile load failed: $e');
+    }
   }
 
   void _startWorkout(Map<String, dynamic> workout) {
@@ -110,7 +114,7 @@ class _MainShellState extends State<MainShell> {
   }
 
   void _showProfile() {
-    Haptics.vibrate(HapticsType.light);
+    SafeHaptics.vibrate(HapticsType.light);
     Navigator.of(context)
         .push<void>(
           PageRouteBuilder<void>(
@@ -281,7 +285,7 @@ class _MainShellState extends State<MainShell> {
               key: ValueKey('nav_${(item['label'] as String).toLowerCase()}'),
               onTap: () {
                 if (_tab != index) {
-                  Haptics.vibrate(HapticsType.selection);
+                  SafeHaptics.vibrate(HapticsType.selection);
                   setState(() => _tab = index);
                 }
               },

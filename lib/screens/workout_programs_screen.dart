@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:haptic_feedback/haptic_feedback.dart';
+import '../utils/safe_haptics.dart';
 import '../constants/colors.dart';
 import '../services/supabase_service.dart';
 
@@ -49,7 +49,7 @@ class _WorkoutProgramsScreenState extends State<WorkoutProgramsScreen> {
     final userId = SupabaseService.currentUser?.id;
     if (userId == null) return;
 
-    Haptics.vibrate(HapticsType.medium);
+    SafeHaptics.vibrate(HapticsType.medium);
     try {
       await SupabaseService.enrollInProgram(userId, programId);
       if (mounted) {

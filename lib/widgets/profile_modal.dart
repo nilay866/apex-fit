@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:haptic_feedback/haptic_feedback.dart';
+import '../utils/safe_haptics.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/supabase_service.dart';
 import '../widgets/apex_button.dart';
@@ -121,7 +121,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _handlePreviewChange() => setState(() {});
 
   Future<void> _showAvatarOptions() async {
-    Haptics.vibrate(HapticsType.light);
+    SafeHaptics.vibrate(HapticsType.light);
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,

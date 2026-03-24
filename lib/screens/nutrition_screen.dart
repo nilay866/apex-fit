@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:haptic_feedback/haptic_feedback.dart';
+import '../utils/safe_haptics.dart';
 import '../constants/colors.dart';
 import '../constants/theme.dart';
 import '../widgets/apex_card.dart';
@@ -74,11 +74,11 @@ class _NutritionScreenState extends State<NutritionScreen> {
 
   Future<void> _saveMeal() async {
     if (_foodC.text.trim().isEmpty) {
-      Haptics.vibrate(HapticsType.error);
+      SafeHaptics.vibrate(HapticsType.error);
       return;
     }
 
-    Haptics.vibrate(HapticsType.medium);
+    SafeHaptics.vibrate(HapticsType.medium);
     setState(() => _saving = true);
 
     // Clear keyboards
@@ -102,7 +102,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
       _carbsC.clear();
       _fatC.clear();
 
-      Haptics.vibrate(HapticsType.success);
+      SafeHaptics.vibrate(HapticsType.success);
       if (mounted) {
         setState(() {
           _aiErr = '';
@@ -110,7 +110,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
         _load();
       }
     } catch (e) {
-      Haptics.vibrate(HapticsType.error);
+      SafeHaptics.vibrate(HapticsType.error);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -124,7 +124,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
   }
 
   void _showAddModal() {
-    Haptics.vibrate(HapticsType.light);
+    SafeHaptics.vibrate(HapticsType.light);
     setState(() {
       _aiErr = '';
     });
@@ -214,7 +214,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
                             }
 
                             // Run lookup logic and update modal state manually alongside outer state
-                            Haptics.vibrate(HapticsType.light);
+                            SafeHaptics.vibrate(HapticsType.light);
                             setModalState(() {
                               _aiLoading = true;
                               _aiErr = '';
@@ -252,11 +252,11 @@ class _NutritionScreenState extends State<NutritionScreen> {
                                     setState(() {
                                       _aiLoading = false;
                                     });
-                                    Haptics.vibrate(HapticsType.success);
+                                    SafeHaptics.vibrate(HapticsType.success);
                                   }
                                 })
                                 .catchError((e) {
-                                  Haptics.vibrate(HapticsType.error);
+                                  SafeHaptics.vibrate(HapticsType.error);
                                   if (mounted) {
                                     setModalState(() {
                                       _aiErr = 'AI lookup failed: $e';
@@ -407,7 +407,7 @@ class _NutritionScreenState extends State<NutritionScreen> {
                               child: ApexButton(
                                 text: 'Cancel',
                                 onPressed: () {
-                                  Haptics.vibrate(HapticsType.light);
+                                  SafeHaptics.vibrate(HapticsType.light);
                                   Navigator.pop(ctx);
                                 },
                                 tone: ApexButtonTone.outline,

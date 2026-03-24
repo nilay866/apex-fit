@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -197,8 +198,9 @@ class _HomeScreenState extends State<HomeScreen> {
           _nfiResult = result;
         });
       }
-    } catch (_) {
-      // Failed to load NFI
+    } catch (e) {
+      debugPrint('NFI load failed: $e');
+      // NFI is supplementary — don't block the dashboard
     }
   }
 
@@ -214,15 +216,21 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _loading = true);
 
     try {
-      final bytes =
-          await FlutterImageCompress.compressWithFile(
-            file.path,
-            quality: 60,
-            minWidth: 800,
-            minHeight: 800,
-            format: CompressFormat.jpeg,
-          ) ??
-          await file.readAsBytes();
+      late final List<int> bytes;
+      if (kIsWeb) {
+        // FlutterImageCompress.compressWithFile uses file paths, not available on web
+        bytes = await file.readAsBytes();
+      } else {
+        bytes =
+            await FlutterImageCompress.compressWithFile(
+              file.path,
+              quality: 60,
+              minWidth: 800,
+              minHeight: 800,
+              format: CompressFormat.jpeg,
+            ) ??
+            await file.readAsBytes();
+      }
 
       final base64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
       await SupabaseService.createProgressPhoto(

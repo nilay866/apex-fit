@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:health/health.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -16,6 +17,8 @@ class HealthService {
   }
 
   static Future<bool> requestPermissions() async {
+    if (kIsWeb) return false; // Health APIs not available on web
+
     final types = [
       HealthDataType.STEPS,
       HealthDataType.ACTIVE_ENERGY_BURNED,
@@ -33,6 +36,7 @@ class HealthService {
   }
 
   static Future<Map<String, dynamic>> fetchDailySummary() async {
+    if (kIsWeb) return {'steps': 0, 'energy': 0.0};
     if (!await isSyncEnabled()) return {'steps': 0, 'energy': 0.0};
 
     final now = DateTime.now();
@@ -77,7 +81,7 @@ class HealthService {
     double? sleepHours;
     double? restingHr;
 
-    if (!await isSyncEnabled()) {
+    if (kIsWeb || !await isSyncEnabled()) {
       return {
         'hrv_ms': hrvMs,
         'sleep_hours': sleepHours,

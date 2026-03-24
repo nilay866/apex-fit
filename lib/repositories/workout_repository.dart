@@ -96,12 +96,17 @@ class WorkoutRepository {
         Map<String, dynamic>.from(logPayload),
       );
 
+      if (createdLog == null || createdLog!['id'] == null) {
+        throw Exception('Failed to create workout log — no ID returned');
+      }
+
       if (sets.isNotEmpty) {
+        final logId = createdLog!['id'];
         final setsWithLogId = sets
             .map(
               (set) => {
                 ...Map<String, dynamic>.from(set),
-                'log_id': createdLog!['id'],
+                'log_id': logId,
               },
             )
             .toList();

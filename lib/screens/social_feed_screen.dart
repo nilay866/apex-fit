@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:haptic_feedback/haptic_feedback.dart';
+import '../utils/safe_haptics.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../constants/colors.dart';
@@ -137,14 +138,14 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
       return;
     }
 
-    Haptics.vibrate(HapticsType.medium);
+    SafeHaptics.vibrate(HapticsType.medium);
     setState(() => _cloningPostId = postId);
 
     try {
       final result = await workoutRepository.cloneWorkoutFromSocialPost(post);
 
       if (mounted) {
-        Haptics.vibrate(HapticsType.success);
+        SafeHaptics.vibrate(HapticsType.success);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -159,7 +160,7 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
       }
     } catch (e) {
       if (mounted) {
-        Haptics.vibrate(HapticsType.error);
+        SafeHaptics.vibrate(HapticsType.error);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(SupabaseService.describeError(e)),
@@ -173,7 +174,7 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
   }
 
   void _showVersus(Map<String, dynamic> post) async {
-    Haptics.vibrate(HapticsType.selection);
+    SafeHaptics.vibrate(HapticsType.selection);
     final userId = post['user_id'] as String;
 
     showModalBottomSheet(
@@ -396,7 +397,7 @@ class _CommunityAddModalState extends State<_CommunityAddModal> {
 
   Future<void> _connect(String id) async {
     if (_connecting) return;
-    Haptics.vibrate(HapticsType.medium);
+    SafeHaptics.vibrate(HapticsType.medium);
     setState(() {
       _connecting = true;
       _connectingUserId = id;
@@ -592,33 +593,49 @@ class _CommunityAddModalState extends State<_CommunityAddModal> {
                 ),
                 if (_showScanner) ...[
                   const SizedBox(height: 16),
-                  Container(
-                    height: 240,
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: ApexColors.accent, width: 2),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: MobileScanner(
-                        onDetect: (capture) {
-                          if (_connecting) return;
-                          final List<Barcode> barcodes = capture.barcodes;
-                          for (final barcode in barcodes) {
-                            if (barcode.rawValue != null) {
-                              try {
-                                final data = jsonDecode(barcode.rawValue!);
-                                if (data['id'] != null) {
-                                  _connect(data['id'] as String);
-                                }
-                              } catch (_) {}
+                  if (kIsWeb)
+                    Container(
+                      height: 240,
+                      decoration: BoxDecoration(
+                        color: ApexColors.cardAlt,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'QR scanning is not available in the web browser.\nUse the mobile app to scan QR codes.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(fontSize: 13, color: ApexColors.t2),
+                        ),
+                      ),
+                    )
+                  else
+                    Container(
+                      height: 240,
+                      decoration: BoxDecoration(
+                        color: Colors.black,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: ApexColors.accent, width: 2),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: MobileScanner(
+                          onDetect: (capture) {
+                            if (_connecting) return;
+                            final List<Barcode> barcodes = capture.barcodes;
+                            for (final barcode in barcodes) {
+                              if (barcode.rawValue != null) {
+                                try {
+                                  final data = jsonDecode(barcode.rawValue!);
+                                  if (data['id'] != null) {
+                                    _connect(data['id'] as String);
+                                  }
+                                } catch (_) {}
+                              }
                             }
-                          }
-                        },
+                          },
+                        ),
                       ),
                     ),
-                  ),
                 ],
                 const SizedBox(height: 24),
                 Text(

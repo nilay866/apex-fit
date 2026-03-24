@@ -4,6 +4,7 @@ import 'package:apex_ai/constants/colors.dart';
 import 'package:apex_ai/widgets/apex_card.dart';
 import 'package:apex_ai/widgets/apex_button.dart';
 import 'package:apex_ai/services/supabase_service.dart';
+import 'package:apex_ai/services/cache_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -96,8 +97,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (confirmed == true) {
       try {
+        // Clear cached data before signing out
+        CacheService().invalidate(null);
         await SupabaseService.signOut();
-      } catch (_) {}
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Sign out failed: ${SupabaseService.describeError(e)}'),
+              backgroundColor: ApexColors.red,
+            ),
+          );
+        }
+      }
     }
   }
 

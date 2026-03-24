@@ -25,7 +25,11 @@ class SupabaseService {
   }
 
   static SupabaseClient get client {
-    if (_client == null) throw Exception('Supabase not initialized');
+    if (_client == null) {
+      throw const AppDataException(
+        'Supabase is not initialized yet. Please restart the app.',
+      );
+    }
     return _client!;
   }
 

@@ -84,7 +84,10 @@ class _AuthScreenState extends State<AuthScreen> {
               'age': _age,
               'fitness_level': _level,
             });
-          } catch (_) {}
+          } catch (e) {
+            // Profile save failed but account was created — continue
+            debugPrint('Profile update after signup failed: $e');
+          }
           if (res.session != null) {
             widget.onAuth();
           } else {

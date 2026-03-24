@@ -157,7 +157,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       }
 
       final userId = authRepository.currentUser?.id;
-      if (userId == null) throw 'User not authenticated';
+      if (userId == null) throw Exception('User not authenticated');
 
       // Capture final state
       final logData = {
