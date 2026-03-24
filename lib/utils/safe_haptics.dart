@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
+export 'package:haptic_feedback/haptic_feedback.dart' show HapticsType;
 import 'package:haptic_feedback/haptic_feedback.dart';
 
 /// Web-safe haptics wrapper. No-op on web where haptics are unavailable.
