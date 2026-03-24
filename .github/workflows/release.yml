@@ -19,31 +19,56 @@ jobs:
           - target: apk
             path: build/app/outputs/flutter-apk/app-release.apk
             name: APEX-Fit-Android.apk
-            build_cmd: flutter build apk --release
           - target: ipa
             path: build/ios/ipa/apex_ai.ipa
             name: APEX-Fit-iOS.ipa
-            build_cmd: flutter build ipa --release --no-codesign
           - target: web
             path: build/web
             name: APEX-Fit-Web.zip
-            build_cmd: flutter build web --release --base-href /apex-fit/
-            
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.41.0'
           channel: 'stable'
           cache: true
-          
+
+      - name: Set up Java (Android)
+        if: matrix.target == 'apk'
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: Install dependencies
         run: flutter pub get
-        
-      - name: Build ${{ matrix.target }}
-        run: ${{ matrix.build_cmd }}
+
+      - name: Build APK
+        if: matrix.target == 'apk'
+        run: |
+          flutter build apk --release \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
+            --dart-define=GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+
+      - name: Build IPA
+        if: matrix.target == 'ipa'
+        run: |
+          flutter build ipa --release --no-codesign \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
+            --dart-define=GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+
+      - name: Build Web
+        if: matrix.target == 'web'
+        run: |
+          flutter build web --release --base-href /apex-fit/ \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
+            --dart-define=GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
         
       - name: Zip Web Build
         if: matrix.target == 'web'

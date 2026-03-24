@@ -16,9 +16,13 @@ jobs:
       
       - name: Install Dependencies
         run: flutter pub get
-      
+
       - name: Build iOS
-        run: flutter build ios --no-codesign
+        run: |
+          flutter build ios --no-codesign \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
+            --dart-define=GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
         
       - name: Create IPA
         run: |
