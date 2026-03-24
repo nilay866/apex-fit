@@ -1,0 +1,156 @@
+[
+  {
+    "name": "Barbell Romanian Deadlift",
+    "category": "strength",
+    "primary_muscle": "Hamstrings",
+    "equipment": "Barbell",
+    "environment": "Gym",
+    "difficulty": "intermediate",
+    "taxonomy_folder": "lower_body/hamstrings",
+    "instructions": ["Hold barbell at hip height.", "Hinge at hips, lowering bar down legs while keeping back flat.", "Feel stretch in hamstrings, return to start."],
+    "heatmaps": {"Hamstrings": 1.0, "Glutes": 0.8, "Lower Back": 0.5}
+  },
+  {
+    "name": "Dumbbell Lateral Raise",
+    "category": "strength",
+    "primary_muscle": "Shoulders",
+    "equipment": "Dumbbells",
+    "environment": "Gym",
+    "difficulty": "beginner",
+    "taxonomy_folder": "upper_body/shoulders",
+    "instructions": ["Stand with dumbbells at sides.", "Raise arms to sides until parallel to floor.", "Lower slowly."],
+    "heatmaps": {"Shoulders": 1.0, "Upper Traps": 0.4}
+  },
+  {
+    "name": "Incline DB Press",
+    "category": "strength",
+    "primary_muscle": "Chest",
+    "equipment": "Dumbbells",
+    "environment": "Gym",
+    "difficulty": "intermediate",
+    "taxonomy_folder": "upper_body/chest",
+    "instructions": ["Lie on incline bench.", "Press dumbbells upward from chest.", "Lower with control."],
+    "heatmaps": {"Upper Chest": 1.0, "Triceps": 0.6, "Shoulders": 0.4}
+  },
+  {
+    "name": "Lateral Lunges",
+    "category": "strength",
+    "primary_muscle": "Quads",
+    "equipment": "Bodyweight",
+    "environment": "Home",
+    "difficulty": "beginner",
+    "taxonomy_folder": "lower_body/quads",
+    "instructions": ["Step wide to the side.", "Lower hips while keeping other leg straight.", "Push back to center."],
+    "heatmaps": {"Quads": 0.8, "Adductors": 1.0, "Glutes": 0.6}
+  },
+  {
+    "name": "Arnold Press",
+    "category": "strength",
+    "primary_muscle": "Shoulders",
+    "equipment": "Dumbbells",
+    "environment": "Gym",
+    "difficulty": "intermediate",
+    "taxonomy_folder": "upper_body/shoulders",
+    "instructions": ["Hold DBs at chest height, palms facing in.", "Rotate palms out as you press upward.", "Reverse rotation on way down."],
+    "heatmaps": {"Shoulders": 1.0, "Triceps": 0.5}
+  },
+  {
+    "name": "Face Pulls",
+    "category": "strength",
+    "primary_muscle": "Shoulders",
+    "equipment": "Cables",
+    "environment": "Gym",
+    "difficulty": "beginner",
+    "taxonomy_folder": "upper_body/back",
+    "instructions": ["Pull rope toward forehead.", "Pull ends apart at end of movement.", "Squeeze rear delts."],
+    "heatmaps": {"Rear Delts": 1.0, "Upper Back": 0.8, "Traps": 0.6}
+  },
+  {
+    "name": "Hammer Curls",
+    "category": "strength",
+    "primary_muscle": "Biceps",
+    "equipment": "Dumbbells",
+    "environment": "Gym",
+    "difficulty": "beginner",
+    "taxonomy_folder": "upper_body/arms",
+    "instructions": ["Hold DBs with neutral grip (palms in).", "Curl toward shoulders.", "Lower slowly."],
+    "heatmaps": {"Brachialis": 1.0, "Biceps": 0.7, "Forearms": 0.6}
+  },
+  {
+    "name": "Skull Crushers",
+    "category": "strength",
+    "primary_muscle": "Triceps",
+    "equipment": "Barbell",
+    "environment": "Gym",
+    "difficulty": "intermediate",
+    "taxonomy_folder": "upper_body/arms",
+    "instructions": ["Lie on bench, bar over chest.", "Bend elbows to lower bar toward forehead.", "Extend elbows to return."],
+    "heatmaps": {"Triceps": 1.0}
+  },
+  {
+    "name": "Bulgarian Split Squat",
+    "category": "strength",
+    "primary_muscle": "Quads",
+    "equipment": "Dumbbells",
+    "environment": "Gym",
+    "difficulty": "advanced",
+    "taxonomy_folder": "lower_body/quads",
+    "instructions": ["One foot on bench behind you.", "Lower into lunge on front leg.", "Drive back up."],
+    "heatmaps": {"Quads": 1.0, "Glutes": 0.9, "Hamstrings": 0.4}
+  },
+  {
+    "name": "Plank with Shoulder Taps",
+    "category": "strength",
+    "primary_muscle": "Core",
+    "equipment": "Bodyweight",
+    "environment": "Home",
+    "difficulty": "intermediate",
+    "taxonomy_folder": "core/abs",
+    "instructions": ["Start in high plank.", "Tap opposite shoulder with hand.", "Keep hips stable, avoid rotating."],
+    "heatmaps": {"Core": 1.0, "Shoulders": 0.5}
+  },
+  {
+    "name": "Burpees",
+    "category": "cardio",
+    "primary_muscle": "Full Body",
+    "equipment": "Bodyweight",
+    "environment": "Home",
+    "difficulty": "intermediate",
+    "taxonomy_folder": "cardio/hiit",
+    "instructions": ["Drop to squat/pushup position.", "Jump feet back, then forward.", "Explode into jump."],
+    "heatmaps": {"Quads": 0.6, "Chest": 0.5, "Core": 0.7}
+  },
+  {
+    "name": "Russian Twists",
+    "category": "strength",
+    "primary_muscle": "Core",
+    "equipment": "Bodyweight",
+    "environment": "Home",
+    "difficulty": "beginner",
+    "taxonomy_folder": "core/abs",
+    "instructions": ["Sit with knees bent, feet elevated.", "Rotate torso side to side.", "Touch floor beside hips."],
+    "heatmaps": {"Obliques": 1.0, "Core": 0.7}
+  },
+  {
+    "name": "Calf Raises (Standing)",
+    "category": "strength",
+    "primary_muscle": "Calves",
+    "equipment": "Dumbbells",
+    "environment": "Home",
+    "difficulty": "beginner",
+    "taxonomy_folder": "lower_body/calves",
+    "instructions": ["Stand on edge of step.", "Rise onto balls of feet.", "Lower heels for stretch."],
+    "heatmaps": {"Calves": 1.0}
+  },
+  {
+    "name": "Glute Bridges",
+    "category": "strength",
+    "primary_muscle": "Glutes",
+    "equipment": "Bodyweight",
+    "environment": "Home",
+    "difficulty": "beginner",
+    "taxonomy_folder": "lower_body/glutes",
+    "instructions": ["Lie on back, feet flat on floor.", "Lift hips toward ceiling.", "Squeeze glutes at top."],
+    "heatmaps": {"Glutes": 1.0, "Hamstrings": 0.5}
+  }
+]

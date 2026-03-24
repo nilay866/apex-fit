@@ -1,0 +1,56 @@
+name: apex_ai
+description: APEX AI — AI-Powered Fitness Coach
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  supabase_flutter: ^2.8.4
+  google_generative_ai: ^0.4.6
+  image_picker: ^1.1.2
+  share_plus: ^12.0.1
+  path_provider: ^2.1.5
+  shared_preferences: ^2.3.4
+  intl: ^0.20.2
+  fl_chart: ^1.1.1
+  flutter_image_compress: ^2.3.0
+  csv: ^7.2.0
+  pdf: ^3.11.2
+  path: ^1.9.1
+  uuid: ^4.5.1
+  google_fonts: ^8.0.2
+  health: ^13.3.1
+  haptic_feedback: ^0.6.4+3
+  video_player: ^2.8.2
+  flutter_map: ^8.2.2
+  latlong2: ^0.9.1
+  flutter_map_location_marker: ^10.2.0
+  geolocator: ^14.0.2
+  live_activities: ^2.4.7
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^7.2.0
+  fuzzy: ^0.5.1
+  http: ^1.2.1
+  google_sign_in: ^7.2.0
+  confetti: ^0.7.0
+  scrollable_positioned_list: ^0.3.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_driver:
+    sdk: flutter
+  integration_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/data/exercise_catalog.json

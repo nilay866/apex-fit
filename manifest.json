@@ -1,0 +1,21 @@
+{
+  "name": "Apex AI",
+  "short_name": "Apex",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#07090F",
+  "theme_color": "#0C1219",
+  "description": "AI-Powered Fitness Coach",
+  "icons": [
+    {
+      "src": "IMG_0886.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "IMG_0886.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

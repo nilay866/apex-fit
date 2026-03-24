@@ -1,0 +1,76 @@
+name: Multi-Platform Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger on version tags like v1.0.0
+
+permissions:
+  contents: write
+
+jobs:
+  build_artifacts:
+    name: Build Multi-Platform
+    runs-on: macos-latest
+    
+    strategy:
+      matrix:
+        include:
+          - target: apk
+            path: build/app/outputs/flutter-apk/app-release.apk
+            name: APEX-Fit-Android.apk
+            build_cmd: flutter build apk --release
+          - target: ipa
+            path: build/ios/ipa/apex_ai.ipa
+            name: APEX-Fit-iOS.ipa
+            build_cmd: flutter build ipa --release --no-codesign
+          - target: web
+            path: build/web
+            name: APEX-Fit-Web.zip
+            build_cmd: flutter build web --release --base-href /apex-fit/
+            
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.0'
+          channel: 'stable'
+          cache: true
+          
+      - name: Install dependencies
+        run: flutter pub get
+        
+      - name: Build ${{ matrix.target }}
+        run: ${{ matrix.build_cmd }}
+        
+      - name: Zip Web Build
+        if: matrix.target == 'web'
+        run: cd build/web && zip -r ../../APEX-Fit-Web.zip .
+        
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ matrix.target == 'web' && 'APEX-Fit-Web.zip' || matrix.path }}
+
+  create_release:
+    name: Create GitHub Release
+    needs: build_artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            artifacts/APEX-Fit-Android.apk
+            artifacts/APEX-Fit-iOS.ipa
+            artifacts/APEX-Fit-Web.zip
